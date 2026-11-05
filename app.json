@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "WON PET PRO",
+    "slug": "wonpet-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./src/assets/icon.png",
+    "splash": {
+      "image": "./src/assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF6B00"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wonpet.pro",
+      "infoPlist": {
+        "NSCameraUsageDescription": "WON PET PRO uses your camera so your vet can see you and your pet during video consultations.",
+        "NSMicrophoneUsageDescription": "WON PET PRO uses your microphone so you can talk to your vet during video consultations."
+      }
+    },
+    "android": {
+      "package": "com.wonpet.pro",
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "backgroundColor": "#FEF7ED"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "WON PET PRO uses your location to find vets and set delivery addresses near you."
+        }
+      ]
+    ],
+    "scheme": "wonpet"
+  }
+}
