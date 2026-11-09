@@ -79,7 +79,7 @@ export default function VideoCallScreen({ route, navigation }: any) {
   const a = appointments.find((x) => x.id === appointmentId);
   const room = jitsiRoomFor(appointmentId);
 
-  const webRef = useRef<WebView>(null);
+  const webRef = useRef<{ injectJavaScript: (js: string) => void } | null>(null);
   const leftRef = useRef(false);
   const inRoomRef = useRef(false);
   const [phase, setPhase] = useState<Phase>('permissions');
@@ -182,7 +182,7 @@ export default function VideoCallScreen({ route, navigation }: any) {
       <View className="flex-1">
         {phase !== 'permissions' && phase !== 'error' && (
           <WebView
-            ref={webRef}
+            {...({ ref: webRef } as object)}
             style={{ flex: 1, backgroundColor: '#000' }}
             originWhitelist={['*']}
             source={{ uri }}

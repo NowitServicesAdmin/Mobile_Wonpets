@@ -1,24 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { T, cn } from '../ui';
 import { appointmentsService, Slot } from '../../services/appointments.service';
 import { to12h } from '../../services/mappers';
+import DateStrip, { buildDays } from '../common/DateStrip';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-export const isoLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export { isoLocal, buildDays } from '../common/DateStrip';
+export type { DayOpt } from '../common/DateStrip';
 /** Appointment dates in the app are "dd/MM". */
-export const ddmm = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+export const ddmm = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 /** "09:00 am" -> "9:00 am" (the style used by existing appointments). */
 export const niceTime = (t: string) => to12h(t);
 
-export type DayOpt = { key: string; dow: string; day: number; month: string; date: Date };
-export const buildDays = (count = 14): DayOpt[] =>
-  Array.from({ length: count }, (_, i) => {
-    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
-    return { key: isoLocal(d), dow: d.toLocaleDateString('en-IN', { weekday: 'short' }), day: d.getDate(), month: d.toLocaleDateString('en-IN', { month: 'short' }), date: d };
-  });
 export const DAYS = buildDays();
 
 type Props = {
@@ -38,7 +33,6 @@ export default function SlotPicker({ day, slot, onDay, onSlot, doctorId }: Props
   const [slots, setSlots] = useState<Slot[]>([]);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
-  const strip = useRef<ScrollView>(null);
   const sel = DAYS.find((d) => d.key === day) ?? DAYS[0];
 
   useEffect(() => {
@@ -62,18 +56,7 @@ export default function SlotPicker({ day, slot, onDay, onSlot, doctorId }: Props
         {!!doctorId && !loading && !note && <Text className="text-xs font-bold text-green">{free} slot{free === 1 ? '' : 's'} free</Text>}
       </View>
 
-      <ScrollView ref={strip} horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pr-2">
-        {DAYS.map((d, i) => {
-          const on = d.key === day;
-          return (
-            <Pressable key={d.key} onPress={() => { onDay(d.key); onSlot(null); }} className={cn('w-[58px] py-3 rounded-2xl items-center border-[1.5px]', on ? 'bg-primary border-primary' : 'bg-white border-line')}>
-              <Text className={cn('text-[11px] font-bold uppercase', on ? 'text-white/90' : 'text-muted')}>{i === 0 ? 'Today' : d.dow}</Text>
-              <Text className={cn('text-[20px] font-black mt-0.5', on ? 'text-white' : 'text-ink')}>{d.day}</Text>
-              <Text className={cn('text-[10px] font-semibold', on ? 'text-white/80' : 'text-muted')}>{d.month}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <DateStrip days={DAYS} value={day} onChange={(k) => { onDay(k); onSlot(null); }} />
 
       {!doctorId ? <Text className={T.body + ' text-center py-3'}>Choose a doctor to see available times.</Text>
         : loading ? <ActivityIndicator color={colors.primary} />

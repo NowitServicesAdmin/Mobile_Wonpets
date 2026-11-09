@@ -37,7 +37,7 @@ const mapInvitation = (c: any, status: Invitation['status']): Invitation => ({
   endDate: isoDay(c.endDate),
   status,
 });
-const mapDirectoryUser = (u: any): DirectoryUser => ({ id: u._id, name: u.name || 'User', emoji: '🧑', photo: absUrl(u.profileImage), email: u.email || '', phone: u.phone || '' });
+const mapDirectoryUser = (u: any): DirectoryUser => ({ id: u._id, name: u.name || 'User', emoji: '🧑', photo: absUrl(u.profileImage), email: u.email || '', phone: u.phone || '', role: u.role || 'user' });
 
 /** Notification prefs: fill any missing key with `true` so every switch has a value. */
 const mergePrefs = (server: any): NotificationPrefs => {
@@ -51,6 +51,11 @@ export const settingsService = {
   async getInfo(): Promise<AdditionalInfo> {
     const { data } = await api.get('/settings/additional');
     return { ...emptyInfo, ...(data.data || {}) };
+  },
+  /** Doctors: once KYC is activated the clinic address is frozen server-side - this tells the form which fields to lock. */
+  async getInfoLock(): Promise<{ locked: boolean; fields: string[] }> {
+    const { data } = await api.get('/settings/additional');
+    return { locked: !!data.lock?.locked, fields: data.lock?.fields || [] };
   },
   async saveInfo(info: AdditionalInfo): Promise<AdditionalInfo> {
     const { data } = await api.put('/settings/additional', info);

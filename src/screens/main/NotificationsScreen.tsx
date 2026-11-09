@@ -9,7 +9,10 @@ import { notificationsService } from '../../services/notifications.service';
 import { errorMessage } from '../../services/api';
 import { NotificationsSkeleton } from '../../components/Skeletons';
 import { useLiveSync } from '../../context/LiveSyncContext';
-import { getNotificationTargetFor } from '../../utils/notificationNavigation';
+import { getDoctorNotificationTarget, getNotificationTargetFor, getStoreNotificationTarget } from '../../utils/notificationNavigation';
+import { useStoreManager } from '../../context/StoreManagerContext';
+import { useAuth } from '../../context/AuthContext';
+import { useDoctor } from '../../context/DoctorContext';
 
 
 export default function NotificationsScreen({ navigation }: any) {
@@ -22,7 +25,14 @@ export default function NotificationsScreen({ navigation }: any) {
     catch (e) { toast.error(errorMessage(e)); }
     finally { setLoading(false); }
   }, []);
-  const { tick } = useLiveSync();
+  const role = useAuth().user?.role;
+  const isDoctor = role === 'doctor';
+  const isStore = role === 'store_manager';
+  // owners are kept fresh by LiveSync, doctors by DoctorContext, store managers by StoreManagerContext
+  const owner = useLiveSync();
+  const doctor = useDoctor();
+  const store = useStoreManager();
+  const tick = isDoctor ? doctor.tick : isStore ? store.tick : owner.tick;
   // first load, then silently reload whenever live sync sees something new
   useEffect(() => { load(); }, [load, tick]);
 
@@ -34,14 +44,14 @@ export default function NotificationsScreen({ navigation }: any) {
 
   const open = (n: Notice) => {
     markOne(n);
-    const target = getNotificationTargetFor(n);
+    const target = isDoctor ? getDoctorNotificationTarget(n) : isStore ? getStoreNotificationTarget(n) : getNotificationTargetFor(n);
     if (!target) return; // informational only - marking it read is enough
     navigation.navigate(target.name, target.params);
   };
 
   const markAll = () => {
     setNotices((l) => l.map((x) => ({ ...x, unread: false })));
-    notificationsService.markAllRead().catch((e) => { toast.error(errorMessage(e)); load(); });
+    notificationsService.markAllRead().then(() => { if (isStore) store.syncNow(); }).catch((e) => { toast.error(errorMessage(e)); load(); });
   };
 
   if (loading) return <NotificationsSkeleton />;
@@ -49,7 +59,7 @@ export default function NotificationsScreen({ navigation }: any) {
     <FlatList className="flex-1 bg-cream" contentContainerClassName="p-4 gap-2.5 pb-8" data={notices} keyExtractor={(n) => n.id}
       refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
       ListEmptyComponent={<Empty emoji="🔔" title="No notifications" body="You're all caught up." />}
-      ListHeaderComponent={notices.some((n) => n.unread) ? <Pressable onPress={markAll} className="mb-2"><Text className="text-primary font-bold text-right">Mark all as read</Text></Pressable> : null}
+      ListHeaderComponent={notices.some((n) => n.unread) ? <Pressable onPress={markAll} className="mb-2"><Text className="text-primary font-bold text-right">Mark all as read</Text></Pressable> : undefined}
       renderItem={({ item }) => (
         <Pressable onPress={() => open(item)} className={cn('flex-row gap-3 p-3.5 rounded-2xl border', item.unread ? 'bg-primary-soft border-primary/30' : 'bg-white border-line')}>
           <View className="w-10 h-10 rounded-full bg-white items-center justify-center"><Ionicons name={item.icon as any} size={20} color={colors.primary} /></View>

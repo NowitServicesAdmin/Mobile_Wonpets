@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./src/assets/icon.png",
-    "splash": {
-      "image": "./src/assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FF6B00"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.wonpet.pro",
@@ -34,6 +29,15 @@
     "plugins": [
       "expo-asset",
       "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./src/assets/splash-icon.png",
+          "backgroundColor": "#FF6B00",
+          "resizeMode": "contain",
+          "imageWidth": 200
+        }
+      ],
       [
         "expo-location",
         {

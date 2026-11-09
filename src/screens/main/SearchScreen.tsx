@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme';
@@ -9,8 +9,17 @@ import { toast } from '../../components/WonPetsAlert';
 import { ClassifyResult, sharedService } from '../../services/shared.service';
 import { SearchGroup, SearchItem, searchService } from '../../services/search.service';
 import { errorMessage } from '../../services/api';
-import { SearchTarget, searchPages } from '../../config/searchPages';
+import { SearchRole, SearchTarget, searchPages } from '../../config/searchPages';
 import { resolveSearchTarget } from '../../utils/searchTarget';
+import { useAuth } from '../../context/AuthContext';
+import { useManaged } from '../../context/ManagedContext';
+
+const SEARCH_HINT: Record<SearchRole, string> = {
+  user: 'Find your pets, products, orders, appointments or any page. Tap the camera to search by photo.',
+  doctor: 'Find your patients, appointments, prescriptions or any page. Tap the camera to search by photo.',
+  store_manager: 'Find your products, orders, customers or any page. Tap the camera to search by photo.',
+  collaborator: 'Find the pets shared with you or any page. Tap the camera to search by photo.',
+};
 
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 300;
@@ -20,6 +29,12 @@ type Row = { key: string; title: string; subtitle?: string; image?: string; badg
 type Section = { label: string; rows: Row[] };
 
 export default function SearchScreen({ navigation, route }: any) {
+  // One search screen for every login - pages and results are scoped to the signed-in role (like the web header search)
+  const { user } = useAuth();
+  const { isManaged } = useManaged();
+  const role: SearchRole = isManaged ? 'collaborator' : user?.role === 'doctor' ? 'doctor' : user?.role === 'store_manager' ? 'store_manager' : 'user';
+  const scope = role === 'collaborator' ? 'shared' : undefined;
+  const hint = SEARCH_HINT[role];
   const [q, setQ] = useState<string>(route.params?.q ?? '');
   const trimmed = q.trim();
   const [groups, setGroups] = useState<SearchGroup[]>([]);
@@ -30,7 +45,7 @@ export default function SearchScreen({ navigation, route }: any) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [result, setResult] = useState<ClassifyResult | null>(null);
   const [scanning, setScanning] = useState(false);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
 
   // header can send a new query / camera request while this screen is already open
   useEffect(() => { if (route.params?.q != null) setQ(route.params.q); }, [route.params?.q]);
@@ -43,7 +58,7 @@ export default function SearchScreen({ navigation, route }: any) {
     setBusy(true); setFailed(false);
     const t = setTimeout(async () => {
       try {
-        const g = await searchService.global(trimmed, controller.signal);
+        const g = await searchService.global(trimmed, controller.signal, scope);
         if (!controller.signal.aborted) { setGroups(g); setFailed(false); }
       } catch (e: any) {
         if (e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError' || controller.signal.aborted) return;
@@ -53,13 +68,13 @@ export default function SearchScreen({ navigation, route }: any) {
       }
     }, DEBOUNCE_MS);
     return () => { clearTimeout(t); controller.abort(); };
-  }, [trimmed]);
+  }, [trimmed, scope]);
 
   // "Pages" (instant, local) first, then whatever the server found
   const sections = useMemo<Section[]>(() => {
     if (trimmed.length < MIN_CHARS) return [];
     const out: Section[] = [];
-    const pages = searchPages(trimmed);
+    const pages = searchPages(trimmed, role);
     if (pages.length) out.push({ label: 'Pages', rows: pages.map((p) => ({ key: `page-${p.title}`, title: p.title, icon: p.icon, go: p.go })) });
     groups.forEach((g, gi) => {
       if (!g.items?.length) return;
@@ -67,12 +82,12 @@ export default function SearchScreen({ navigation, route }: any) {
         label: g.label,
         rows: g.items.map((it: SearchItem, i) => ({
           key: `${gi}-${it.id ?? it.path}-${i}`, title: it.title, subtitle: it.subtitle, image: it.image, badge: it.badge,
-          go: resolveSearchTarget(it.path), raw: it.path,
+          go: resolveSearchTarget(it.path, role), raw: it.path,
         })),
       });
     });
     return out;
-  }, [trimmed, groups]);
+  }, [trimmed, groups, role]);
   const flat = sections.flatMap((s) => s.rows);
   const nothingFound = trimmed.length >= MIN_CHARS && !busy && !failed && flat.length === 0;
 
@@ -137,7 +152,7 @@ export default function SearchScreen({ navigation, route }: any) {
           </View>
         )}
 
-        {trimmed.length < MIN_CHARS && !camera && <Empty emoji="🔎" title="Search WON PET PRO" body="Find your pets, products, orders, appointments or any page. Tap the camera to search by photo." />}
+        {trimmed.length < MIN_CHARS && !camera && <Empty emoji="🔎" title="Search WON PET PRO" body={hint} />}
 
         {sections.map((s) => (
           <View key={s.label} className="gap-2">

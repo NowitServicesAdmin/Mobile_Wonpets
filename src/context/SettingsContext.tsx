@@ -42,7 +42,7 @@ export const useSettings = () => useContext(SettingsContext);
 const localPlans: Plan[] = fallbackPlans.map((p) => ({ id: p.id, name: p.name, emoji: p.emoji, monthly: p.price === 'FREE' ? 0 : Number(p.price.replace(/\D/g, '')), features: p.features, color: p.color }));
 
 /** Settings data, loaded from the backend once the user is signed in. Every mutation calls the API and then updates local state. */
-export function SettingsProvider({ children }: { children: React.ReactNode }) {
+export function SettingsProvider({ children, scope = 'owner' }: { children: React.ReactNode; /** 'doctor' loads only what a doctor's Profile needs (clinic info, documents, notification prefs) - no plans / collaborators of their own (they only receive invitations). */ scope?: 'owner' | 'doctor' | 'store' }) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState<Plan[]>(localPlans);
@@ -59,18 +59,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const reload = useCallback(async () => {
     setLoading(true);
     // each call is independent - one failing endpoint must not blank the rest of Settings
+    const owner = scope === 'owner';
     await Promise.all([
-      settingsService.getPlans().then((r) => { if (r.plans.length) setPlans(r.plans); if (r.yearlySaving != null) setYearlySaving(r.yearlySaving); }).catch(() => {}),
-      settingsService.getMySubscription().then(setSubscription).catch(() => {}),
+      owner && settingsService.getPlans().then((r) => { if (r.plans.length) setPlans(r.plans); if (r.yearlySaving != null) setYearlySaving(r.yearlySaving); }).catch(() => {}),
+      owner && settingsService.getMySubscription().then(setSubscription).catch(() => {}),
       settingsService.getInfo().then(setInfo).catch(() => {}).finally(() => setInfoLoaded(true)),
       settingsService.getPrefs().then(setPrefs).catch(() => {}),
       settingsService.getDocuments().then(setDocuments).catch(() => {}),
-      settingsService.listCollaborators().then(setCollaborators).catch(() => {}),
+      owner && settingsService.listCollaborators().then(setCollaborators).catch(() => {}),
+      // invitations ("Shared With Me") apply to every role - a doctor can be invited to look after someone's pets too
       settingsService.listInvitations().then(setInvitations).catch(() => {}),
     ]);
     setLoading(false);
     setReady(true);
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     if (user?.id) reload();

@@ -19,6 +19,14 @@ const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionico
   Settings: ['person-outline', 'person'], // the Settings screen is now the Profile tab (route name unchanged)
   SharedHome: ['home-outline', 'home'],
   SharedPets: ['paw-outline', 'paw'],
+  DoctorHome: ['home-outline', 'home'],
+  DoctorSchedule: ['calendar-outline', 'calendar'],
+  DoctorPatients: ['paw-outline', 'paw'],
+  DoctorProfile: ['person-outline', 'person'],
+  SMHome: ['home-outline', 'home'],
+  SMOrders: ['receipt-outline', 'receipt'],
+  SMManage: ['grid-outline', 'grid'],
+  SMProfile: ['person-outline', 'person'],
 };
 
 /** Floating pill tab bar: the active tab expands into an orange pill with its label, the others show just an icon. */

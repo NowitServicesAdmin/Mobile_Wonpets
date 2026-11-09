@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Image, ImageBackground, Linking, Pressable, Text, View, useWindowDimensions, ViewToken } from 'react-native';
+import { FlatList, Image, ImageBackground, Linking, Pressable, Text, View, useWindowDimensions, ListViewToken } from 'react-native';
 import { cn } from '../ui';
 import { CarouselSlide } from '../../services/store.service';
 
@@ -45,7 +45,7 @@ export default function OfferCarousel({ slides, onOpen }: { slides: CarouselSlid
     return () => clearInterval(t);
   }, [slides.length]);
 
-  const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const onViewable = useCallback(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const first = viewableItems[0];
     if (first?.index != null) setIndex(first.index);
   }, []);

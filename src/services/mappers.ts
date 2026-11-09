@@ -321,17 +321,18 @@ export function mapMessage(m: any, meId: string): ChatMessage {
 }
 
 /** A server conversation -> the conversation, the other person as a contact, the unread count and the last message. */
-export function mapConversation(c: any, meId: string) {
+/** `viewerRole`: when a doctor opens a vet chat, the other person is a pet owner (no "Dr." prefix, "Pet owner" subtitle). */
+export function mapConversation(c: any, meId: string, viewerRole: AppRole = 'user') {
   const kind = kindFromApi(c.chatType);
   const other = (c.participants || []).find((p: any) => idOf(p) !== meId) || {};
   const l = c.listingId && typeof c.listingId === 'object' ? c.listingId : null;
   const contact: ChatContact = {
     id: idOf(other),
     kind,
-    name: kind === 'vet' ? withDr(other.name) || 'Doctor' : other.name || 'User',
-    emoji: KIND_EMOJI[kind],
+    name: kind === 'vet' && viewerRole !== 'doctor' ? withDr(other.name) || 'Doctor' : other.name || 'User',
+    emoji: kind === 'vet' && viewerRole === 'doctor' ? '🙂' : KIND_EMOJI[kind],
     image: absUrl(other.profileImage),
-    subtitle: kind === 'vet' ? 'Veterinary' : kind === 'collab' ? 'Collaborator' : 'Seller',
+    subtitle: kind === 'vet' ? (viewerRole === 'doctor' ? 'Pet owner' : 'Veterinary') : kind === 'collab' ? 'Collaborator' : 'Seller',
     status: kind === 'resell' ? undefined : ((other.effectiveStatus || (other.isOnline ? 'online' : 'offline')) as PresenceStatus),
   };
   const conversation: Conversation = {

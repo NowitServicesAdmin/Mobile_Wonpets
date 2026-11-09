@@ -66,11 +66,11 @@ function CollaboratorSheet({ visible, editing, onClose }: { visible: boolean; ed
               <View className="gap-2">
                 <Text className="font-bold text-ink">Find a user</Text>
                 {user ? (
-                  <View className="flex-row items-center gap-3 rounded-2xl border border-primary bg-primary-soft/60 p-3"><Avatar image={user.photo} emoji={user.emoji} size={40} /><View className="flex-1"><Text className={T.h3}>{user.name}</Text><Text className={T.small}>{user.email}</Text></View><Pressable onPress={() => setUser(null)}><Ionicons name="close-circle" size={20} color={colors.muted} /></Pressable></View>
+                  <View className="flex-row items-center gap-3 rounded-2xl border border-primary bg-primary-soft/60 p-3"><Avatar image={user.photo} emoji={user.emoji} size={40} /><View className="flex-1"><Text className={T.h3}>{user.name}</Text><Text className={T.small}>{user.email}</Text></View>{!!user.role && user.role !== 'user' && <Chip label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} tone="orange" />}<Pressable onPress={() => setUser(null)}><Ionicons name="close-circle" size={20} color={colors.muted} /></Pressable></View>
                 ) : (
                   <>
                     <View className="flex-row items-center gap-2 border-[1.5px] border-line rounded-2xl px-3"><Ionicons name="search-outline" size={17} color={colors.muted} /><TextInput value={q} onChangeText={setQ} placeholder="Search by name, email or phone" placeholderTextColor="#B8AEA5" autoCapitalize="none" className="flex-1 py-3" /></View>
-                    {hits.map((u) => <Pressable key={u.id} onPress={() => setUser(u)} className="flex-row items-center gap-3 rounded-2xl border border-line p-3 active:bg-cream"><Avatar image={u.photo} emoji={u.emoji} size={40} /><View className="flex-1"><Text className={T.h3}>{u.name}</Text><Text className={T.small}>{u.email} · {u.phone}</Text></View></Pressable>)}
+                    {hits.map((u) => <Pressable key={u.id} onPress={() => setUser(u)} className="flex-row items-center gap-3 rounded-2xl border border-line p-3 active:bg-cream"><Avatar image={u.photo} emoji={u.emoji} size={40} /><View className="flex-1"><Text className={T.h3}>{u.name}</Text><Text className={T.small}>{u.email} · {u.phone}</Text></View>{!!u.role && u.role !== 'user' && <Chip label={u.role.charAt(0).toUpperCase() + u.role.slice(1)} tone="orange" />}</Pressable>)}
                     {searching && <Text className={T.small}>Searching…</Text>}
                     {!searching && q.trim().length >= 2 && hits.length === 0 && <Text className={T.small}>No users found.</Text>}
                   </>

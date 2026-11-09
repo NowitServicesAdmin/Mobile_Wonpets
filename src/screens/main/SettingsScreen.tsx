@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,7 +77,7 @@ export default function SettingsScreen({ route }: any) {
   const nav = useNavigation<any>();
   const focused = useIsFocused();
   const [open, setOpen] = useState<Key | null>(toKey(route.params?.open));
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   const place = headerLocation(info, user?.location); // same source as the app header
   const pendingInvites = invitations.filter((i) => i.status === 'pending').length;
   const planName = subscription ? plans.find((p) => p.id === subscription.planId)?.name ?? 'Plan' : 'Free';

@@ -24,8 +24,8 @@ type Ctx = {
 const LiveSyncContext = createContext<Ctx>({ unread: 0, tick: 0, syncNow: async () => {} });
 export const useLiveSync = () => useContext(LiveSyncContext);
 
-const POLL_MS = 8000;   // cheap check (unread count) - catches anything that creates a notification within ~8s
-const FULL_MS = 30000;  // full refresh of every area even if nothing notified (catches silent changes)
+const POLL_MS = 20000;   // cheap check (unread count) - catches anything that creates a notification within ~20s
+const FULL_MS = 90000;  // full refresh of every area even if nothing notified (catches silent changes)
 
 // Server events that mean "something changed for this user". Unknown names are harmless.
 const EVENTS = [
@@ -36,11 +36,17 @@ const EVENTS = [
   'order_created', 'order_updated', 'order_status', 'schedule_updated', 'pet_updated',
 ];
 
+/** Lets a role that has no full LiveSyncProvider (the doctor) feed the shared "Shared With Me" screens their refresh tick. */
+export function LiveSyncTickProvider({ tick, unread = 0, syncNow, children }: { tick: number; unread?: number; syncNow: () => Promise<void>; children: React.ReactNode }) {
+  const value = useMemo(() => ({ unread, tick, syncNow }), [unread, tick, syncNow]);
+  return <LiveSyncContext.Provider value={value}>{children}</LiveSyncContext.Provider>;
+}
+
 /**
  * Keeps the WHOLE app fresh without pull-to-refresh:
  *  1. socket.io push (instant, if the backend emits it)
- *  2. every 8s while the app is open: check the unread count - if it changed, refresh everything
- *  3. every 30s: refresh everything anyway
+ *  2. every 20s while the app is open: check the unread count - if it changed, refresh everything
+ *  3. every 90s: refresh everything anyway
  *  4. coming back to the app: refresh everything
  * "Everything" = invitations, collaborators, shared accounts, pets, appointments, schedule,
  * orders, cart, wishlist, chat list and resell listings. All refreshes are silent (no spinners, no error toasts).

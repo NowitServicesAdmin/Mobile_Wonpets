@@ -59,3 +59,44 @@ export function getNotificationTargetFor(n: { actionUrl?: string; type?: string;
     default: return null;
   }
 }
+
+export function getDoctorNotificationTarget(n: { actionUrl?: string; type?: string }): SearchTarget | null {
+  const url = n.actionUrl && !/^https?:\/\//i.test(n.actionUrl) ? n.actionUrl : '';
+  const appt = param(url, 'appointmentId');
+  if (appt) return { name: 'DoctorAppointment', params: { id: appt } };
+  if (/\/chat(\?|$)/.test(url)) return { name: 'Chat' };
+  if (/\/doctor\/(schedule|dashboard)/.test(url)) return { name: 'DoctorMain', params: { screen: 'DoctorSchedule' } };
+  switch (n.type) {
+    case 'Appointment': return { name: 'DoctorMain', params: { screen: 'DoctorSchedule' } };
+    case 'Message': return { name: 'Chat' };
+    // an owner shared pets with this doctor -> Profile > Shared With Me
+    case 'Collaboration': return { name: 'DoctorMain', params: { screen: 'DoctorProfile', params: { open: 'shared', at: Date.now() } } };
+    default: return null;
+  }
+}
+
+
+/** Store manager: order notifications open the order itself (web link /storemanager/management/orders?open=order&orderId=…). */
+export function getStoreNotificationTarget(n: { actionUrl?: string; type?: string; title?: string; body?: string }): SearchTarget | null {
+  const url = n.actionUrl && !/^https?:\/\//i.test(n.actionUrl) ? n.actionUrl : '';
+  const orderId = param(url, 'orderId');
+  if (orderId) return { name: 'SMOrderDetail', params: { id: orderId } };
+  const tab = (screen: string, params?: object): SearchTarget => ({ name: 'SMMain', params: { screen, params } });
+  if (/\/management\/orders/.test(url)) return tab('SMOrders');
+  if (/\/management\/reviews/.test(url)) return { name: 'SMReviews' };
+  if (/\/management\/inventory/.test(url)) return { name: 'SMInventory' };
+  if (/\/management\/products/.test(url)) return { name: 'SMProducts' };
+  if (/\/management\/offers/.test(url)) return { name: 'SMOffers' };
+  if (/\/earnings/.test(url)) return { name: 'SMEarnings' };
+  if (/\/settings/.test(url)) return tab('SMProfile', { open: /kyc/i.test(url) ? 'kyc' : /document/i.test(url) ? 'documents' : 'store', at: Date.now() });
+  const text = `${n.title ?? ''} ${n.body ?? ''}`.toLowerCase();
+  switch (n.type) {
+    case 'Order': return tab('SMOrders');
+    case 'System':
+      if (/stock/.test(text)) return { name: 'SMInventory' };
+      if (/review/.test(text)) return { name: 'SMReviews' };
+      if (/kyc|payout/.test(text)) return tab('SMProfile', { open: 'kyc', at: Date.now() });
+      return null;
+    default: return null;
+  }
+}

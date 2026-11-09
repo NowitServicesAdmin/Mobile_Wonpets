@@ -46,6 +46,8 @@ export type Appointment = {
   petId?: string; doctorId?: string; fee?: number; reason?: string; visitType?: string; isoDate?: string; homeAddress?: string; attachments?: string[];
   /** Filled in by the API mapper. */
   appointmentNo?: string; time24?: string; meetingLink?: string; hasPrescription?: boolean; paymentStatus?: string; doctorImage?: string; doctorSpec?: string; clinic?: string; petImage?: string;
+  /** Filled in for the doctor role: who owns the pet being seen. */
+  owner?: string; ownerId?: string; ownerPhone?: string; ownerImage?: string; breed?: string; petGender?: string; petWeight?: string; aiNote?: string; mapUrl?: string;
 };
 export const appointments: Appointment[] = [
   { id: 'a1', pet: 'Rocky', emoji: '🐶', age: '7 years 7 m…', date: '08/07', time: '7:00 pm', status: 'Completed', mode: 'Clinic Visit', doctor: 'Dr. Anitha Rao', doctorId: 'd1', fee: 400, visitType: 'Check-up', reason: 'Annual check-up and weight review.', notes: 'Mild skin allergy found. Prescription issued, review in 3 weeks.' },

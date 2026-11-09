@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Button, cn } from '../../components/ui';
@@ -40,7 +40,7 @@ export default function ManageTasksScreen({ navigation, route }: any) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const set = (patch: Partial<typeof emptyForm>) => setForm((f) => ({ ...f, ...patch }));
 
   // daily tasks depend on the pet's animal type, so load them per pet

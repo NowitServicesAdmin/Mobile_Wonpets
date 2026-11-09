@@ -63,11 +63,13 @@ export function DateTile({ a, size = 60 }: { a: Appointment; size?: number }) {
   );
 }
 
-function Action({ label, icon, onPress, solid }: { label: string; icon: IconName; onPress: () => void; solid?: boolean }) {
+export type CardAction = { label: string; icon: IconName; onPress: () => void; solid?: boolean; danger?: boolean };
+
+function Action({ label, icon, onPress, solid, danger }: CardAction) {
   return (
-    <Pressable onPress={onPress} className={cn('flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl active:opacity-80', solid ? 'bg-primary' : 'bg-primary-soft')}>
-      <Ionicons name={icon} size={15} color={solid ? '#fff' : colors.primary} />
-      <Text className={cn('text-[13px] font-bold', solid ? 'text-white' : 'text-primary')}>{label}</Text>
+    <Pressable onPress={onPress} accessibilityRole="button" className={cn('flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl active:opacity-80', solid ? 'bg-primary' : danger ? 'bg-red-soft' : 'bg-primary-soft')}>
+      <Ionicons name={icon} size={15} color={solid ? '#fff' : danger ? colors.red : colors.primary} />
+      <Text className={cn('text-[13px] font-bold', solid ? 'text-white' : danger ? 'text-red' : 'text-primary')}>{label}</Text>
     </Pressable>
   );
 }
@@ -76,10 +78,21 @@ function Action({ label, icon, onPress, solid }: { label: string; icon: IconName
  * Appointment row: status-tinted date tile, pet + status pill, time / visit type / doctor.
  * The whole card opens the details screen; quick actions (join / prescription / reschedule) sit underneath when they apply.
  */
-export default function AppointmentCard({ item, onOpen, onJoin, onPrescription, onReschedule }: {
+export default function AppointmentCard({ item, onOpen, onJoin, onPrescription, onReschedule, actions, viewer = 'owner' }: {
   item: Appointment; onOpen: () => void; onJoin?: () => void; onPrescription?: () => void; onReschedule?: () => void;
+  /** Extra / custom buttons under the card (the doctor's Accept / Start / Complete…). */
+  actions?: CardAction[];
+  /** Whose point of view: the owner sees the doctor, the doctor sees the pet owner. */
+  viewer?: 'owner' | 'doctor';
 }) {
-  const hasActions = !!(onJoin || onPrescription || onReschedule);
+  const buttons: CardAction[] = [
+    ...(onJoin ? [{ label: 'Join now', icon: 'videocam' as IconName, onPress: onJoin, solid: true }] : []),
+    ...(onPrescription ? [{ label: 'Prescription', icon: 'document-text-outline' as IconName, onPress: onPrescription }] : []),
+    ...(onReschedule ? [{ label: 'Reschedule', icon: 'calendar-outline' as IconName, onPress: onReschedule }] : []),
+    ...(actions ?? []),
+  ];
+  const hasActions = buttons.length > 0;
+  const party = viewer === 'doctor' ? (item.owner ?? 'Pet owner') : (item.doctor ?? 'Doctor to be assigned');
   const m = STATUS_META[item.status] ?? STATUS_META.Pending;
   return (
     <View className="bg-white rounded-3xl border border-line overflow-hidden shadow-sm shadow-orange-900/10">
@@ -101,16 +114,14 @@ export default function AppointmentCard({ item, onOpen, onJoin, onPrescription, 
             <Text className={cn('text-[13px] flex-shrink', item.mode === 'Emergency' ? 'text-red font-bold' : 'text-muted')} numberOfLines={1}>{item.mode}</Text>
           </View>
           <View className="flex-row items-center justify-between">
-            <Text className="text-[13px] text-muted flex-1" numberOfLines={1}>{item.doctor ?? 'Doctor to be assigned'}{item.visitType ? ` · ${item.visitType}` : ''}</Text>
+            <Text className="text-[13px] text-muted flex-1" numberOfLines={1}>{party}{viewer === 'doctor' && item.reason ? ` · ${item.reason}` : item.visitType ? ` · ${item.visitType}` : ''}</Text>
             <Ionicons name="chevron-forward" size={18} color="#CDBFB0" />
           </View>
         </View>
       </Pressable>
       {hasActions && (
         <View style={{ backgroundColor: m.soft + '55' }} className="flex-row gap-2 px-3.5 py-3 border-t border-orange-100">
-          {!!onJoin && <Action solid label="Join now" icon="videocam" onPress={onJoin} />}
-          {!!onPrescription && <Action label="Prescription" icon="document-text-outline" onPress={onPrescription} />}
-          {!!onReschedule && <Action label="Reschedule" icon="calendar-outline" onPress={onReschedule} />}
+          {buttons.map((b) => <Action key={b.label} {...b} />)}
         </View>
       )}
     </View>

@@ -23,7 +23,7 @@ const TRACK = { false: '#E5DDD3', true: colors.primary };
 
 /** Email / Notifications / Alerts as three collapsible cards: the master switch sits on the header, tap the header to open the list.
  *  There is no Save button: every change is saved automatically (a short pause after the last tap, so quick taps become one request). */
-export default function NotificationsSection() {
+export default function NotificationsSection({ only }: { /** limit the switches per group (the web's NOTIFICATION_CATEGORIES_BY_ROLE) - e.g. store managers only see order alerts */ only?: Partial<Record<PrefGroup, string[]>> } = {}) {
   const { prefs, savePrefs } = useSettings();
   const [p, setP] = useState<NotificationPrefs>(prefs);
   const [state, setState] = useState<SaveState>('idle');
@@ -84,7 +84,9 @@ export default function NotificationsSection() {
       {(Object.keys(NOTIFICATION_GROUPS) as PrefGroup[]).map((g) => {
         const grp = NOTIFICATION_GROUPS[g]; const ui = GROUP_UI[g];
         const on = p[g].enabled; const isOpen = openG[g];
-        const keys = Object.keys(grp.categories);
+        const cats = Object.entries(grp.categories).filter(([k]) => !only || (only[g] ?? []).includes(k));
+        const keys = cats.map(([k]) => k);
+        if (only && !keys.length) return null;
         const active = keys.filter((k) => p[g][k]).length;
         return (
           <View key={g} className="bg-white rounded-3xl border border-orange-100 overflow-hidden">
@@ -102,7 +104,7 @@ export default function NotificationsSection() {
             {isOpen && (
               <View className="border-t border-line">
                 <Text className="px-3.5 pt-3 pb-1 text-[12px] text-muted">{grp.description}</Text>
-                {Object.entries(grp.categories).map(([k, c], i) => (
+                {cats.map(([k, c], i) => (
                   <View key={k} className={cn('flex-row items-center gap-3 px-3.5 py-3', i > 0 && 'border-t border-line', !on && 'opacity-40')}>
                     <View className="flex-1"><Text className="text-[14px] font-bold text-ink">{c.title}</Text><Text className={T.small}>{c.description}</Text></View>
                     <Switch disabled={!on} value={on && p[g][k]} onValueChange={() => toggle(g, k)} trackColor={TRACK} thumbColor="#fff" ios_backgroundColor="#E5DDD3" />

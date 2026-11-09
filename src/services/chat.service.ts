@@ -34,12 +34,15 @@ export const chatService = {
   },
 
   /** People the owner can chat with in the "Collab" tab: their accepted collaborators + owners who delegated access to them. */
-  async collaboratorContacts(): Promise<{ id: string; name: string; subtitle: string }[]> {
+  async collaboratorContacts(role: string = 'user'): Promise<{ id: string; name: string; subtitle: string }[]> {
     const out: { id: string; name: string; subtitle: string }[] = [];
-    try {
-      const { data } = await api.get('/collaborators/owned');
-      (data.collaborators || []).filter((c: any) => c.status === 'accepted' && c.collaborator).forEach((c: any) => out.push({ id: String(c.collaborator._id), name: c.collaborator.name, subtitle: 'Collaborator' }));
-    } catch { /* not allowed for this role */ }
+    // only pet owners can have collaborators of their own; the server answers 403 to doctors / store managers
+    if (role === 'user') {
+      try {
+        const { data } = await api.get('/collaborators/owned');
+        (data.collaborators || []).filter((c: any) => c.status === 'accepted' && c.collaborator).forEach((c: any) => out.push({ id: String(c.collaborator._id), name: c.collaborator.name, subtitle: 'Collaborator' }));
+      } catch { /* ignore */ }
+    }
     try {
       const { data } = await api.get('/collaborators/delegated');
       (data.accounts || []).filter((a: any) => a.owner).forEach((a: any) => out.push({ id: String(a.owner._id), name: a.owner.name, subtitle: 'Account owner' }));

@@ -26,7 +26,7 @@ type Ctx = {
   finishOnboarding: () => Promise<void>;
   /** Call with the token + user returned by verify-otp / register / google login. */
   startSession: (s: Session) => Promise<SessionResult>;
-  updateProfile: (patch: { name: string; gender?: User['gender']; location?: string; imageUri?: string }) => Promise<void>;
+  updateProfile: (patch: { name: string; gender?: User['gender']; location?: string; imageUri?: string; /** added once, only while the account has none (same rule as the web) */ email?: string; phone?: string }) => Promise<void>;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -88,8 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const startSession: Ctx['startSession'] = async ({ token, user: api }: Session) => {
-    if (fromApiRole(api.role) !== 'user') {
-      return { ok: false, message: 'This app is for pet owners. Please use the WON PET web portal for your doctor / store manager account.' };
+    // pet owners, doctors and store managers have an app; admins use the web portal
+    const role = fromApiRole(api.role);
+    if (role !== 'user' && role !== 'doctor' && role !== 'store_manager') {
+      return { ok: false, message: 'This app is for pet owners, doctors and store managers. Please use the WON PET web portal for this account.' };
     }
     await tokenStore.set(token);
     await persist(mapUser(api as ApiUser));
@@ -111,6 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       gender: patch.gender ? toApiGender(patch.gender) : undefined,
       address: patch.location,
       imageUri: patch.imageUri,
+      email: patch.email,
+      phone: patch.phone,
     });
     await persist({ ...(cur as User), ...mapUser(updated) });
   };

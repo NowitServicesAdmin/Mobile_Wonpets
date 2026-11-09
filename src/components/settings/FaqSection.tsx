@@ -6,9 +6,9 @@ import { FAQS } from '../../data/settings';
 import { T } from '../ui';
 import { settingsService } from '../../services/settings.service';
 
-export default function FaqSection() {
+export default function FaqSection({ fallback = FAQS }: { /** shown when the server has no FAQs (store managers pass their own) */ fallback?: typeof FAQS } = {}) {
   const [open, setOpen] = useState<number | null>(null);
-  const [faqs, setFaqs] = useState(FAQS);
+  const [faqs, setFaqs] = useState(fallback);
   useEffect(() => { settingsService.getFaqs().then((l) => { if (l.length) setFaqs(l); }).catch(() => {}); }, []); // built-in answers stay if the server has none
   return (
     <View className="gap-2.5">

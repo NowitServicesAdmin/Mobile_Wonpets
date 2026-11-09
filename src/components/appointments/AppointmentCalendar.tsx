@@ -23,7 +23,7 @@ export const isoOf = (a: Appointment) => {
   return `${new Date().getFullYear()}-${mm}-${dd}`;
 };
 
-export default function AppointmentCalendar({ appointments, onOpen }: { appointments: Appointment[]; onOpen: (a: Appointment) => void }) {
+export default function AppointmentCalendar({ appointments, onOpen, viewer = 'owner' }: { appointments: Appointment[]; onOpen: (a: Appointment) => void; viewer?: 'owner' | 'doctor' }) {
   const today = new Date();
   const todayKey = keyOf(today);
   const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -99,7 +99,7 @@ export default function AppointmentCalendar({ appointments, onOpen }: { appointm
     <PetAvatar emoji={a.emoji} image={a.petImage} size={46} />
     <View className="flex-1 gap-1">
       <View className="flex-row items-center justify-between"><Text className={T.h3} numberOfLines={1}>{a.pet}</Text><Text className="text-xs font-extrabold text-primary">{a.time}</Text></View>
-      <View className="flex-row items-center gap-1.5"><Avatar image={a.doctorImage} emoji="🩺" size={18} /><Text className={cn(T.small, 'flex-1')} numberOfLines={1}>{a.doctor ?? 'Doctor'} · {a.mode}</Text></View>
+      <View className="flex-row items-center gap-1.5"><Avatar image={viewer === 'doctor' ? a.ownerImage : a.doctorImage} emoji={viewer === 'doctor' ? '🙂' : '🩺'} size={18} /><Text className={cn(T.small, 'flex-1')} numberOfLines={1}>{viewer === 'doctor' ? (a.owner ?? 'Pet owner') : (a.doctor ?? 'Doctor')} · {a.mode}</Text></View>
       <StatusPill status={a.status} />
     </View>
     <Ionicons name="chevron-forward" size={16} color={colors.muted} />

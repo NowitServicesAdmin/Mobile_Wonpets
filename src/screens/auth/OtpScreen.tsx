@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { Button, cn } from '../../components/ui';
 import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
 import { useAuth } from '../../context/AuthContext';
@@ -16,7 +16,7 @@ export default function OtpScreen({ route, navigation }: any) {
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(30);
   const [busy, setBusy] = useState(false);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     const t = setInterval(() => setSeconds((x) => (x > 0 ? x - 1 : 0)), 1000);

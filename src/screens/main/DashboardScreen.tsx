@@ -116,7 +116,7 @@ export default function DashboardScreen({ navigation, route }: any) {
     <ScrollView
       className="flex-1 bg-cream"
       contentContainerClassName="p-4 gap-[18px] pb-10"
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => Promise.all([refreshAll(), refreshOrders()])} tintColor={colors.primary} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={async () => { await Promise.all([refreshAll(), refreshOrders()]); }} tintColor={colors.primary} />}
     >
       <PetHeroBanner
         userName={user?.name}

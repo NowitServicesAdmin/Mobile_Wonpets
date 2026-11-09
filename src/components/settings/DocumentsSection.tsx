@@ -5,15 +5,15 @@ import * as DocumentPicker from 'expo-document-picker';
 import { colors } from '../../theme';
 import { Button, Chip, T } from '../ui';
 import { WonPetsAlert, toast } from '../WonPetsAlert';
-import { DOCUMENT_TYPES } from '../../data/settings';
+import { DOCUMENT_TYPES, DocType } from '../../data/settings';
 import { useSettings } from '../../context/SettingsContext';
 import { errorMessage } from '../../services/api';
 
 const MAX = 5 * 1024 * 1024;
 const fmtSize = (b?: number) => (!b ? '' : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
-/** Upload an identity proof (PDF or image) to the backend. */
-export default function DocumentsSection() {
+/** Upload documents (PDF or image) to the backend. Owners upload an identity proof; doctors pass `types` to add their medical licence too. */
+export default function DocumentsSection({ types = DOCUMENT_TYPES }: { types?: DocType[] }) {
   const { documents, uploadDocument, removeDocument } = useSettings();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -39,11 +39,11 @@ export default function DocumentsSection() {
 
   return (
     <View className="gap-3">
-      {DOCUMENT_TYPES.map((d) => {
+      {types.map((d) => {
         const doc = documents[d.key];
         return (
           <View key={d.key} className="rounded-2xl border border-line bg-cream p-3.5 gap-2.5">
-            <View className="flex-row items-center gap-2.5"><View className="w-10 h-10 rounded-xl bg-primary-soft items-center justify-center"><Ionicons name="shield-checkmark" size={18} color={colors.primary} /></View><View className="flex-1"><Text className={T.h3}>{d.title}</Text><Text className={T.small}>{d.hint}</Text></View>{doc ? <Chip label="Uploaded" tone="green" /> : <Chip label="Required" tone="yellow" />}</View>
+            <View className="flex-row items-center gap-2.5"><View className="w-10 h-10 rounded-xl bg-primary-soft items-center justify-center"><Ionicons name={d.key === 'medicalLicense' ? 'medkit' : 'shield-checkmark'} size={18} color={colors.primary} /></View><View className="flex-1"><Text className={T.h3}>{d.title}</Text><Text className={T.small}>{d.hint}</Text></View>{doc ? <Chip label="Uploaded" tone="green" /> : <Chip label="Required" tone="yellow" />}</View>
             {doc ? (
               <View className="flex-row items-center gap-3 bg-white rounded-xl p-3">
                 <Ionicons name={doc.name.toLowerCase().endsWith('.pdf') ? 'document-text' : 'image'} size={22} color={colors.primary} />

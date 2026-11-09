@@ -66,6 +66,7 @@ export default function RootNavigator() {
             <Stack.Screen name="SharedMain" component={SharedTabs} />
             <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: true, title: 'Messages', headerTintColor: colors.text }} />
             <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
+            <Stack.Screen name="Search" component={SearchScreen} options={{ headerShown: true, title: 'Search', headerTintColor: colors.text }} />
           </>
         ) : (
           <>

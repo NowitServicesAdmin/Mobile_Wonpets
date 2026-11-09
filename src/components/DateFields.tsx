@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { colors } from '../theme';
 import { isoToParts, todayInputValue, toIso } from '../utils/petAge';
 import { cn } from './ui';
@@ -21,8 +21,8 @@ export default function DateFields({ label, value, onChange, max, min, hint }: P
   const [day, setDay] = useState(init.day);
   const [month, setMonth] = useState(init.month);
   const [year, setYear] = useState(init.year);
-  const monthRef = useRef<TextInput>(null);
-  const yearRef = useRef<TextInput>(null);
+  const monthRef = useRef<TextInputInstance>(null);
+  const yearRef = useRef<TextInputInstance>(null);
 
   // keep in sync when the parent resets / prefills the value
   useEffect(() => {

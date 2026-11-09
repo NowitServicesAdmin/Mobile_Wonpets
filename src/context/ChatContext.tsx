@@ -53,7 +53,9 @@ const upsertMsg = (list: ChatMessage[] = [], m: ChatMessage) => {
  */
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const { appointments } = usePets();
+  // the doctor app has no PetsProvider - usePets() is then an empty object
+  const { appointments = [] } = usePets();
+  const viewerRole = user?.role ?? 'user';
   const meId = user?.id ?? '';
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -76,7 +78,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (!meId) return;
     if (!quiet) setLoading(true);
     try {
-      const rows = (await chatService.conversations()).map((c) => mapConversation(c, meId));
+      const rows = (await chatService.conversations()).map((c) => mapConversation(c, meId, viewerRole));
       setConversations(rows.map((r) => r.conversation));
       setContacts((cur) => {
         let next = [...cur];
@@ -90,16 +92,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, [meId]);
+  }, [meId, viewerRole]);
   const refresh = useCallback(() => load(false), [load]);
   /** Silent re-fetch of conversations + collab contacts - used by live sync. */
   const refreshQuiet = useCallback(async () => { await load(true); }, [load]);
 
   // collaborators for the "Collab" top row
   const loadCollabContacts = useCallback(async () => {
-    const list = await chatService.collaboratorContacts();
+    const list = await chatService.collaboratorContacts(viewerRole);
     list.forEach((c) => upsertContact({ id: c.id, kind: 'collab', name: c.name, emoji: '🙂', subtitle: c.subtitle, status: 'offline' }));
-  }, []);
+  }, [viewerRole]);
 
   // doctors you have an appointment with can be messaged
   useEffect(() => {
@@ -180,7 +182,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (existing) return existing.id;
     try {
       const raw = kind === 'vet' ? await chatService.startVet(contactId) : kind === 'collab' ? await chatService.startCollab(contactId) : await chatService.startResell(contactId, listing?.id);
-      const { conversation, contact, unread: u, last } = mapConversation(raw, meId);
+      const { conversation, contact, unread: u, last } = mapConversation(raw, meId, viewerRole);
       setConversations((list) => (list.some((c) => c.id === conversation.id) ? list : [...list, conversation]));
       upsertContact({ ...contact, ...(contacts.find((c) => c.id === contact.id && c.kind === kind) ?? {}), id: contact.id, kind, image: contact.image });
       setUnread((m) => ({ ...m, [conversation.id]: m[conversation.id] ?? u }));

@@ -35,6 +35,28 @@ export const defaultPrefs = (): NotificationPrefs =>
 
 // ---------- documents (pet owners upload an identity proof) ----------
 export const DOCUMENT_TYPES = [{ key: 'identity', title: 'Identity Proof', hint: 'Aadhaar, passport, driving licence or voter ID. PDF or image, up to 5 MB.' }];
+export type DocType = { key: string; title: string; hint: string };
+/** Doctors upload two documents (same two as the web Settings > Documents). */
+export const DOCTOR_DOCUMENT_TYPES: DocType[] = [
+  { key: 'medicalLicense', title: 'Medical License', hint: 'Your veterinary registration / licence. PDF or image, up to 5 MB.' },
+  { key: 'identity', title: 'Identity Proof', hint: 'Aadhaar, passport, driving licence or voter ID. PDF or image, up to 5 MB.' },
+];
+/** Store managers upload three documents (same as the web Settings > Documents). */
+export const STORE_DOCUMENT_TYPES: DocType[] = [
+  { key: 'business', title: 'Business License', hint: 'Shop / trade licence or registration certificate. PDF or image, up to 5 MB.' },
+  { key: 'gst', title: 'GST Certificate', hint: 'Your GST registration certificate. PDF or image, up to 5 MB.' },
+  { key: 'identity', title: 'Identity Proof', hint: 'Aadhaar, passport, driving licence or voter ID. PDF or image, up to 5 MB.' },
+];
+/** Which notification switches a store manager sees (web NOTIFICATION_CATEGORIES_BY_ROLE['store manager']). */
+export const STORE_NOTIFICATION_KEYS = { email: ['orders', 'importantAlerts'], notifications: ['orders'], alerts: ['subscriptionReminders', 'importantAlerts'] };
+/** Store manager FAQs (shown when the server has none). */
+export const STORE_FAQS = [
+  { q: 'How do I add a product or a pet?', a: 'Open Manage > Products and tap Add Product. Choose Product or Pet, fill in the price and stock, add up to 4 photos and save.' },
+  { q: 'What happens when I accept an order?', a: 'The order moves to Processing. If courier delivery is on, a shipment is created - print the label, pack the parcel and tap Request pickup.' },
+  { q: 'Why are pets not delivered by courier?', a: 'Live pets are never shipped through the app. Buyers contact you by phone or email and you agree on delivery and payment together.' },
+  { q: 'When is an item "Low stock"?', a: 'Anything with 50 units or fewer is low stock; 0 units is out of stock. Update stock from Manage > Inventory.' },
+  { q: 'Why is my store address locked?', a: 'Once your KYC is activated and the courier pickup address is ready, the address is frozen. Contact support to change it.' },
+];
 export type SettingsDoc = { type: string; name: string; size: string; uri: string };
 
 // ---------- additional information ----------
@@ -42,6 +64,10 @@ export type AdditionalInfo = {
   location: string; doorNo: string; address: string; city: string; district: string; state: string; country: string; pincode: string;
   /** Filled from the location picker (same fields the web sends) so the backend can geocode / find nearby vets. */
   placeId?: string; latitude?: number | string; longitude?: number | string; formattedAddress?: string;
+  /** Doctor-only fields (same names the web Additional Information form sends for the doctor role). */
+  clinicName?: string; specialization?: string; experience?: string | number; clinicAddress?: string;
+  /** Store-manager-only fields (same names the web Additional Information form sends for the store manager role). */
+  storeName?: string; storeCategory?: string; gstNumber?: string; storeAddress?: string;
 };
 export const emptyInfo: AdditionalInfo = { location: '', doorNo: '', address: '', city: '', district: '', state: '', country: '', pincode: '' };
 
@@ -56,7 +82,7 @@ export type CollabStatus = 'pending' | 'accepted' | 'declined' | 'revoked' | 'ex
 /** A pet shown on a collaborator / invitation card (name + photo, emoji when there is no photo). */
 export type SharedPet = { id: string; name: string; emoji: string; image?: string };
 export type Collaborator = { id: string; name: string; emoji: string; photo?: string; contact: string; petIds: string[]; pets: SharedPet[]; startDate: string; endDate: string; status: CollabStatus };
-export type DirectoryUser = { id: string; name: string; emoji: string; photo?: string; email: string; phone: string };
+export type DirectoryUser = { id: string; name: string; emoji: string; photo?: string; email: string; phone: string; /** 'doctor' / 'store manager' etc. - plain pet owners are 'user' */ role?: string };
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export const collabIsExpired = (c: Pick<Collaborator, 'endDate'>) => !!c.endDate && c.endDate < todayIso();
 

@@ -168,7 +168,7 @@ export default function StoreScreen({ navigation, route }: any) {
       onRefresh={async () => { setRefreshing(true); loadMeta(); await load(1); setRefreshing(false); }}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
-      ListFooterComponent={loading || failed ? null : <LoadMoreFooter loading={loadingMore} hasMore={hasMore} failed={moreFailed} onRetry={loadMore} total={total} noun="items" />}
+      ListFooterComponent={loading || failed ? undefined : <LoadMoreFooter loading={loadingMore} hasMore={hasMore} failed={moreFailed} onRetry={loadMore} total={total} noun="items" />}
       ListEmptyComponent={
         loading ? <ProductGridSkeleton count={6} />
         : failed ? <Empty emoji="📡" title="Couldn't load the store" body="Check your connection and pull down to try again." />

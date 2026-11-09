@@ -8,6 +8,7 @@ import { ChatKind, sidebarTime } from '../../data/chat';
 import { useChat } from '../../context/ChatContext';
 import { ChatListSkeleton } from '../../components/Skeletons';
 import { useManaged } from '../../context/ManagedContext';
+import { useAuth } from '../../context/AuthContext';
 
 const ALL_TABS: ChatKind[] = ['vet', 'collab', 'resell'];
 const topLabel: Partial<Record<ChatKind, string>> = { vet: 'Our Top Doctors', collab: 'Your Collaborators' };
@@ -22,10 +23,11 @@ const emptyText: Record<ChatKind, string> = {
 export default function ChatScreen({ navigation, route }: any) {
   const { contacts, conversations, messages, unreadByKind, unreadFor, startConversation, lastMessage, refresh, loading } = useChat();
   const { isManaged } = useManaged();
-  // in the shared view only the owner conversations make sense (no vets / resell)
-  const TABS = isManaged ? (['collab'] as ChatKind[]) : ALL_TABS;
+  const isDoctor = useAuth().user?.role === 'doctor';
+  // in the shared view only the owner conversations make sense (no vets / resell); a doctor only talks to pet owners
+  const TABS = isDoctor ? (['vet'] as ChatKind[]) : isManaged ? (['collab'] as ChatKind[]) : ALL_TABS;
   const [opening, setOpening] = useState(false);
-  const [tab, setTab] = useState<ChatKind>(isManaged ? 'collab' : route.params?.tab ?? 'vet');
+  const [tab, setTab] = useState<ChatKind>(isDoctor ? 'vet' : isManaged ? 'collab' : route.params?.tab ?? 'vet');
   const [q, setQ] = useState('');
   const accent = ACCENT[tab];
 
@@ -55,7 +57,7 @@ export default function ChatScreen({ navigation, route }: any) {
 
   return (
     <View className="flex-1 bg-cream">
-      <View className="flex-row gap-2 px-4 pt-3 pb-2">
+      {!isDoctor && <View className="flex-row gap-2 px-4 pt-3 pb-2">
         {TABS.map((k) => {
           const on = tab === k; const count = unreadByKind[k];
           return (
@@ -65,12 +67,12 @@ export default function ChatScreen({ navigation, route }: any) {
             </Pressable>
           );
         })}
-      </View>
+      </View>}
 
       <FlatList data={rows} keyExtractor={(r) => r.c.id} contentContainerClassName="pb-8" refreshing={loading} onRefresh={refresh}
         ListHeaderComponent={
-          <View>
-            {top.length > 0 && (
+          <View className={isDoctor ? 'pt-3' : undefined}>
+            {top.length > 0 && !isDoctor && (
               <View className="mx-4 mt-2 mb-3 rounded-3xl border border-orange-100 bg-white/70 px-4 py-3">
                 <Text className={cn(T.h3, 'mb-3')}>{isManaged && tab === 'collab' ? managedTopLabel : topLabel[tab]}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-5">
@@ -89,7 +91,7 @@ export default function ChatScreen({ navigation, route }: any) {
             </View>
           </View>
         }
-        ListEmptyComponent={loading && !rows.length ? <ChatListSkeleton /> : <View className="pt-6"><Empty emoji="💬" title="No conversations" body={q ? 'Nothing matches your search.' : (isManaged && tab === 'collab' ? 'No conversations yet — pick a pet owner above to start one.' : emptyText[tab])} /></View>}
+        ListEmptyComponent={loading && !rows.length ? <ChatListSkeleton /> : <View className="pt-6"><Empty emoji="💬" title="No conversations" body={q ? 'Nothing matches your search.' : isDoctor ? 'Pet owners will appear here when they message you.' : (isManaged && tab === 'collab' ? 'No conversations yet — pick a pet owner above to start one.' : emptyText[tab])} /></View>}
         renderItem={({ item: { c, contact, last } }) => {
           const unread = unreadFor(c.id);
           return (

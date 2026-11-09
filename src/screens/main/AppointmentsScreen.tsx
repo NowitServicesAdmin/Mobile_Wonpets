@@ -175,7 +175,7 @@ export default function AppointmentsScreen({ navigation }: any) {
             {view === 'calendar' && <AppointmentCalendar appointments={list} onOpen={(a) => navigation.navigate('AppointmentDetail', { id: a.id })} />}
           </View>
         }
-        ListEmptyComponent={!loaded ? <AppointmentListSkeleton /> : view === 'list' ? <Empty emoji="🩺" title="No appointments" body={appointments.length ? 'Nothing matches these filters.' : 'Book your first visit to see it here.'} /> : null}
+        ListEmptyComponent={!loaded ? <AppointmentListSkeleton /> : view === 'list' ? <Empty emoji="🩺" title="No appointments" body={appointments.length ? 'Nothing matches these filters.' : 'Book your first visit to see it here.'} /> : undefined}
         renderItem={({ item }) => (
           <AppointmentCard
             item={item}
@@ -185,7 +185,7 @@ export default function AppointmentsScreen({ navigation }: any) {
             onReschedule={item.status === 'Pending' || item.status === 'Confirmed' ? () => setResched(item) : undefined}
           />
         )}
-        ListFooterComponent={view === 'list' && loaded ? <LoadMoreFooter hasMore={hasMore} total={list.length} noun="appointments" /> : null}
+        ListFooterComponent={view === 'list' && loaded ? <LoadMoreFooter hasMore={hasMore} total={list.length} noun="appointments" /> : undefined}
       />
 
       <Pressable onPress={() => navigation.navigate('BookAppointment')} accessibilityRole="button" accessibilityLabel="Book appointment"
