@@ -11,7 +11,7 @@ import FilterChips from '../../components/common/FilterChips';
 import BottomSheet from '../../components/common/BottomSheet';
 import InfoGrid from '../../components/common/InfoField';
 import LoadMoreFooter from '../../components/LoadMoreFooter';
-import { TONES, DTone } from '../../components/doctor/DoctorUI';
+import { PageHeader, WebStatGrid, DTone } from '../../components/doctor/DoctorUI';
 import { Badge, Fab, LoadError, RowAction, StockBadge, inr0 } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { useInfiniteSlice } from '../../hooks/useInfiniteSlice';
@@ -95,15 +95,8 @@ export default function SMProductsScreen({ navigation, route }: any) {
 
   const header = (
     <View className="gap-3.5 mb-1">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2.5 pr-2">
-        {stats.map((s) => (
-          <View key={s.label} className="w-[104px] bg-white rounded-2xl border border-orange-100 p-3">
-            <View className={cn('w-9 h-9 rounded-xl items-center justify-center mb-1.5', TONES[s.tone].soft)}><Ionicons name={s.icon} size={17} color={TONES[s.tone].fg} /></View>
-            <Text className="text-[20px] font-black text-slate-800">{s.value}</Text>
-            <Text className="text-[11px] text-slate-500" numberOfLines={1}>{s.label}</Text>
-          </View>
-        ))}
-      </ScrollView>
+      <PageHeader icon="cube" title={category?.name ?? 'Products'} subtitle="Every product and pet listed in your store." />
+      <WebStatGrid stats={stats.slice(0, 4).map((x) => ({ title: x.label, value: x.value, icon: x.icon, tone: x.tone, caption: x.label === 'Total' ? `${stats[4].value} pets in store` : undefined }))} />
       <SearchBar value={search} onChangeText={setSearch} placeholder="Search products, pets, breeds…" trailing={{ icon: 'swap-vertical', label: 'Sort', onPress: () => setSortOpen(true) }} />
       {!!category && (
         <Pressable onPress={() => setCategory(null)} className="self-start flex-row items-center gap-1.5 bg-orange-100 rounded-full pl-3 pr-2 py-1.5">
@@ -128,21 +121,21 @@ export default function SMProductsScreen({ navigation, route }: any) {
         ListEmptyComponent={<Empty emoji="📦" title={all.length ? 'No matching products' : 'No products yet'} body={all.length ? 'Try another search or filter.' : 'Tap "Add Product" to list your first item.'} />}
         ListFooterComponent={list.length ? <LoadMoreFooter hasMore={page.hasMore} total={page.total} noun="products" /> : undefined}
         renderItem={({ item: p }) => (
-          <Pressable onPress={() => setView(p)} accessibilityRole="button" accessibilityLabel={p.name} className="flex-row gap-3 bg-white rounded-3xl border border-orange-100 p-3 active:bg-orange-50/40">
+          <Pressable onPress={() => setView(p)} accessibilityRole="button" accessibilityLabel={p.name} className="flex-row gap-3 bg-white rounded-3xl border border-line p-3 active:bg-primary-soft">
             <Avatar image={p.images[0]} emoji={p.itemType === 'pet' ? '🐾' : '📦'} size={76} square />
             <View className="flex-1 gap-1">
               <View className="flex-row items-center gap-1.5">
-                <Text className="flex-1 font-extrabold text-slate-800" numberOfLines={1}>{p.name}</Text>
+                <Text className="flex-1 font-extrabold text-ink" numberOfLines={1}>{p.name}</Text>
                 {p.status === 'Inactive' && <Badge label="Inactive" tone="slate" />}
               </View>
-              <Text className="text-[11px] text-slate-500" numberOfLines={1}>{p.itemType === 'pet' ? `🐾 Pet${p.breed ? ` · ${p.breed}` : ''}` : 'Product'} · {p.categoryName || 'Uncategorised'}</Text>
+              <Text className="text-[11px] text-muted" numberOfLines={1}>{p.itemType === 'pet' ? `🐾 Pet${p.breed ? ` · ${p.breed}` : ''}` : 'Product'} · {p.categoryName || 'Uncategorised'}</Text>
               <View className="flex-row items-center gap-1.5">
                 <Text className="font-black text-green-600">{inr0(p.finalPrice)}</Text>
-                {p.discount > 0 && <><Text className="text-[11px] text-slate-400 line-through">{inr0(p.price)}</Text><Badge label={`${p.discount}% OFF`} tone="green" /></>}
+                {p.discount > 0 && <><Text className="text-[11px] text-muted line-through">{inr0(p.price)}</Text><Badge label={`${p.discount}% OFF`} tone="green" /></>}
               </View>
               <View className="flex-row items-center gap-2">
                 <StockBadge status={stockStatus(p.stock)} />
-                <Text className="text-[11px] text-slate-500">{p.stock} units</Text>
+                <Text className="text-[11px] text-muted">{p.stock} units</Text>
                 {p.reviews > 0 && <Text className="text-[11px] text-amber-600">★ {p.rating.toFixed(1)}</Text>}
               </View>
             </View>
@@ -202,7 +195,7 @@ export default function SMProductsScreen({ navigation, route }: any) {
             </View>
             <View className="bg-white rounded-3xl border border-line p-4">
               <Text className="font-extrabold text-ink mb-1">Description</Text>
-              <Text className="text-[13.5px] text-slate-600 leading-5">{view.description || 'No description added.'}</Text>
+              <Text className="text-[13.5px] text-muted leading-5">{view.description || 'No description added.'}</Text>
             </View>
           </>
         )}

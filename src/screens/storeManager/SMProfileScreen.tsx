@@ -141,13 +141,13 @@ export default function SMProfileScreen({ navigation, route }: any) {
   const group = (title: string, items: Item[]) => (
     <View key={title}>
       <Text maxFontSizeMultiplier={1.1} className="text-[12px] font-extrabold text-muted uppercase tracking-wider mb-1.5 ml-2">{title}</Text>
-      <View className="bg-white rounded-3xl border border-orange-100 overflow-hidden">{items.map(renderRow)}</View>
+      <View className="bg-white rounded-3xl border border-line overflow-hidden">{items.map(renderRow)}</View>
     </View>
   );
 
   const body = () => {
     if (!open) return null;
-    if (!ready && SERVER_BACKED.includes(open)) return <Card className="border-orange-100"><FormSkeleton fields={3} /></Card>;
+    if (!ready && SERVER_BACKED.includes(open)) return <Card className="border-line"><FormSkeleton fields={3} /></Card>;
     const el = {
       profile: <DoctorProfileForm />,
       store: <StoreDetailsSection />,
@@ -159,7 +159,7 @@ export default function SMProfileScreen({ navigation, route }: any) {
       faq: <FaqSection fallback={STORE_FAQS} />,
       support: <ContactSection />,
     }[open];
-    return NO_CARD.includes(open) ? el : <Card className="border-orange-100">{el}</Card>;
+    return NO_CARD.includes(open) ? el : <Card className="border-line">{el}</Card>;
   };
 
   return (
@@ -179,7 +179,7 @@ export default function SMProfileScreen({ navigation, route }: any) {
       <ScrollView ref={scroll} className="flex-1" contentContainerClassName="p-4 gap-3.5 pb-10" keyboardShouldPersistTaps="handled">
         {open ? body() : (
           <>
-            <Pressable onPress={() => setOpen('profile')} accessibilityRole="button" accessibilityLabel="Edit profile" className="flex-row items-center gap-3 bg-white rounded-3xl border border-orange-100 p-3.5 active:opacity-80">
+            <Pressable onPress={() => setOpen('profile')} accessibilityRole="button" accessibilityLabel="Edit profile" className="flex-row items-center gap-3 bg-white rounded-3xl border border-line p-3.5 active:opacity-80">
               <View className="rounded-full p-0.5 bg-orange-300"><View className="rounded-full bg-white p-0.5"><Avatar image={user?.profileImage} emoji="🏪" size={60} /></View></View>
               <View className="flex-1">
                 <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-[18px] font-black text-ink">{user?.name ?? 'Store manager'}</Text>
@@ -198,7 +198,7 @@ export default function SMProfileScreen({ navigation, route }: any) {
             </Pressable>
 
             {todo.length > 0 && (
-              <View className="bg-primary-soft rounded-3xl border border-orange-100 p-3.5 gap-2.5">
+              <View className="bg-primary-soft rounded-3xl border border-line p-3.5 gap-2.5">
                 <View className="flex-row items-center gap-2"><Ionicons name="sparkles-outline" size={16} color={colors.primary} /><Text className="flex-1 text-[14px] font-extrabold text-ink">Finish setting up your store</Text></View>
                 <View className="flex-row flex-wrap gap-2">{todo.map((t) => <Chip key={t.key} tone="white" label={`+ ${t.label}`} onPress={() => setOpen(t.key)} />)}</View>
               </View>

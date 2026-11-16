@@ -9,7 +9,7 @@ import { toast } from '../../components/WonPetsAlert';
 import SearchBar from '../../components/common/SearchBar';
 import BottomSheet from '../../components/common/BottomSheet';
 import LoadMoreFooter from '../../components/LoadMoreFooter';
-import { TONES, DTone } from '../../components/doctor/DoctorUI';
+import { PageHeader, WebStatGrid, DTone } from '../../components/doctor/DoctorUI';
 import { Badge, LoadError, StockBadge, SwitchRow } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { useInfiniteSlice } from '../../hooks/useInfiniteSlice';
@@ -80,18 +80,11 @@ export default function SMInventoryScreen({ navigation }: any) {
 
   const header = (
     <View className="gap-3.5 mb-1">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2.5 pr-2">
-        {stats.map((s) => (
-          <Pressable key={s.label} onPress={() => setFilter(s.f)} className="w-[104px] bg-white rounded-2xl border border-orange-100 p-3 active:bg-orange-50">
-            <View className={cn('w-9 h-9 rounded-xl items-center justify-center mb-1.5', TONES[s.tone].soft)}><Ionicons name={s.icon} size={17} color={TONES[s.tone].fg} /></View>
-            <Text className="text-[20px] font-black text-slate-800">{s.value}</Text>
-            <Text className="text-[11px] text-slate-500">{s.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <PageHeader icon="layers" title="Inventory" subtitle="Watch stock levels and keep listings available." />
+      <WebStatGrid stats={stats.slice(1).map((x) => ({ title: x.label, value: x.value, icon: x.icon, tone: x.tone, onPress: () => setFilter(x.f) }))} />
 
       {critical.length > 0 && (
-        <View className="bg-white rounded-3xl border border-red-100 p-3.5">
+        <View className="bg-white rounded-3xl border border-red-200 p-3.5">
           <View className="flex-row items-center gap-2 mb-2.5">
             <Ionicons name="alert-circle" size={18} color={colors.red} />
             <Text className="flex-1 font-extrabold text-ink">Reorder soon</Text>
@@ -99,14 +92,14 @@ export default function SMInventoryScreen({ navigation }: any) {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2.5">
             {critical.slice(0, 8).map((p) => (
-              <Pressable key={p.id} onPress={() => open(p)} className="w-[132px] rounded-2xl border border-slate-100 p-2.5 active:bg-orange-50">
+              <Pressable key={p.id} onPress={() => open(p)} className="w-[132px] rounded-2xl border border-line bg-cream p-2.5 active:bg-primary-soft">
                 <View className="flex-row items-center justify-between">
                   <Avatar image={p.images[0]} emoji={p.itemType === 'pet' ? '🐾' : '📦'} size={34} square />
                   <View className={cn('min-w-[34px] h-[34px] px-1 rounded-xl items-center justify-center', p.stock === 0 ? 'bg-red-100' : 'bg-orange-100')}>
                     <Text className={cn('font-black', p.stock === 0 ? 'text-red-600' : 'text-orange-600')}>{p.stock}</Text>
                   </View>
                 </View>
-                <Text className="text-[12px] font-semibold text-slate-700 mt-1.5" numberOfLines={2}>{p.name}</Text>
+                <Text className="text-[12px] font-semibold text-ink mt-1.5" numberOfLines={2}>{p.name}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -135,18 +128,18 @@ export default function SMInventoryScreen({ navigation }: any) {
         ListEmptyComponent={<Empty emoji={filter === 'attention' ? '✅' : '📦'} title={filter === 'attention' ? 'All stocked up' : 'No inventory found'} body={filter === 'attention' ? 'Nothing is low, out of stock or hidden.' : 'Try changing the search or filter.'} />}
         ListFooterComponent={list.length ? <LoadMoreFooter hasMore={page.hasMore} total={page.total} noun="items" /> : undefined}
         renderItem={({ item: p }) => (
-          <View className="flex-row items-center gap-3 bg-white rounded-2xl border border-orange-100 p-3">
+          <View className="flex-row items-center gap-3 bg-white rounded-2xl border border-line p-3">
             <Avatar image={p.images[0]} emoji={p.itemType === 'pet' ? '🐾' : '📦'} size={52} square />
             <View className="flex-1 gap-1">
-              <Text className="font-bold text-slate-800" numberOfLines={1}>{p.name}</Text>
-              <Text className="text-[11px] text-slate-500" numberOfLines={1}>{p.categoryName || 'Uncategorised'} · {p.itemType === 'pet' ? 'Pet' : 'Product'}</Text>
+              <Text className="font-bold text-ink" numberOfLines={1}>{p.name}</Text>
+              <Text className="text-[11px] text-muted" numberOfLines={1}>{p.categoryName || 'Uncategorised'} · {p.itemType === 'pet' ? 'Pet' : 'Product'}</Text>
               <View className="flex-row gap-1.5">
                 <StockBadge status={stockStatus(p.stock)} />
                 {p.status === 'Inactive' && <Badge label="Inactive" tone="slate" />}
               </View>
             </View>
             <View className="items-center gap-1.5">
-              <Text className="text-[18px] font-black text-slate-800">{p.stock}</Text>
+              <Text className="text-[18px] font-black text-ink">{p.stock}</Text>
               <Pressable onPress={() => open(p)} accessibilityRole="button" accessibilityLabel={`Update stock for ${p.name}`} className="flex-row items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-100 active:opacity-70">
                 <Ionicons name="create-outline" size={13} color="#EA580C" /><Text className="text-orange-600 font-bold text-[12px]">Update</Text>
               </Pressable>

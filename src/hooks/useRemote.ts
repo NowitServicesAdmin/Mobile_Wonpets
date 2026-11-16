@@ -1,4 +1,5 @@
-import { DependencyList, useCallback, useEffect, useRef, useState } from 'react';
+import { DependencyList, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { NavigationContext } from '@react-navigation/native';
 import { errorMessage } from '../services/api';
 
 /**
@@ -6,6 +7,8 @@ import { errorMessage } from '../services/api';
  *  - `loading`    true only for a (re)load triggered by `deps` changing - show a skeleton
  *  - `refreshing` true during pull-to-refresh - show the RefreshControl spinner
  *  - quiet reloads (`quietKey` changing, e.g. the live-sync tick) never flash a spinner or an error
+ *  - a quiet reload is held back while the screen is not in front (other tabs / screens buried in the stack)
+ *    and runs once when the screen comes back, so one live tick no longer fans out into a request per mounted screen
  * Out-of-order answers are dropped, so quickly switching a filter / date can never show stale data.
  */
 export function useRemote<T>(fetcher: () => Promise<T>, deps: DependencyList = [], quietKey?: unknown) {
@@ -16,6 +19,8 @@ export function useRemote<T>(fetcher: () => Promise<T>, deps: DependencyList = [
   const fetchRef = useRef(fetcher);
   fetchRef.current = fetcher;
   const seq = useRef(0);
+  const nav = useContext(NavigationContext);   // undefined outside a navigator
+  const missedTick = useRef(false);
 
   const run = useCallback(async (mode: 'load' | 'pull' | 'quiet') => {
     const id = ++seq.current;
@@ -36,8 +41,15 @@ export function useRemote<T>(fetcher: () => Promise<T>, deps: DependencyList = [
   const first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
+    if (nav && !nav.isFocused()) { missedTick.current = true; return; }
     run('quiet');
-  }, [quietKey, run]);
+  }, [quietKey, run]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!nav) return;
+    return nav.addListener('focus', () => {
+      if (missedTick.current) { missedTick.current = false; run('quiet'); }
+    });
+  }, [nav, run]);
 
   return {
     data, loading, refreshing, error, setData,

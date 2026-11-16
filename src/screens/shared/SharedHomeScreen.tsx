@@ -6,6 +6,7 @@ import { colors } from '../../theme';
 import { Card, Chip, Empty, Gradient, SectionHeader, T, cn } from '../../components/ui';
 import { Avatar } from '../../components/Avatar';
 import ProgressRing from '../../components/ProgressRing';
+import CompletableRow, { AllDoneNote } from '../../components/dashboard/CompletableRow';
 import { toast } from '../../components/WonPetsAlert';
 import { useAuth } from '../../context/AuthContext';
 import { useManaged } from '../../context/ManagedContext';
@@ -234,7 +235,7 @@ export default function SharedHomeScreen() {
                   nestedScrollEnabled
                   showsVerticalScrollIndicator
                   style={{ maxHeight: TASK_LIST_MAX_HEIGHT }}
-                  contentContainerStyle={{ gap: 8 }}
+                  contentContainerStyle={{ paddingBottom: 0 }}
                 >
                   {visible.map((t) => {
                     const st = taskStyle(t);
@@ -242,7 +243,8 @@ export default function SharedHomeScreen() {
                     const done = t.status === 'completed';
                     const pet = petById[t.petId];
                     return (
-                      <View key={t.key} className={cn('flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', done ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
+                      <CompletableRow key={t.key} done={done}>
+                      <View className={cn('flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', done ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
                         <View className={cn('w-10 h-10 rounded-xl items-center justify-center', st.box)}><Ionicons name={st.icon} size={19} color={st.fg} /></View>
                         <View className="flex-1">
                           <Text maxFontSizeMultiplier={1.1} className={cn('text-[14px] font-extrabold', done ? 'line-through text-muted' : 'text-ink')} numberOfLines={1}>{t.title}</Text>
@@ -263,9 +265,11 @@ export default function SharedHomeScreen() {
                           </Pressable>
                         )}
                       </View>
+                      </CompletableRow>
                     );
                   })}
                 </ScrollView>
+                <AllDoneNote show={visible.every((t) => t.status === 'completed')} />
 
                 {/* bottom summary */}
                 <View className="flex-row gap-2 mt-3 pt-3.5 border-t border-orange-100">

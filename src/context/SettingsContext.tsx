@@ -59,7 +59,9 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
   const reload = useCallback(async () => {
     setLoading(true);
     // each call is independent - one failing endpoint must not blank the rest of Settings
-    const owner = scope === 'owner';
+    // only pet owners have collaborators / plans of their own; the server answers 403 to doctors & store managers
+    // (guards the brief moment the owner tree is mounted while a doctor's session is still being restored)
+    const owner = scope === 'owner' && user?.role === 'user';
     await Promise.all([
       owner && settingsService.getPlans().then((r) => { if (r.plans.length) setPlans(r.plans); if (r.yearlySaving != null) setYearlySaving(r.yearlySaving); }).catch(() => {}),
       owner && settingsService.getMySubscription().then(setSubscription).catch(() => {}),
@@ -72,14 +74,17 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
     ]);
     setLoading(false);
     setReady(true);
-  }, [scope]);
+  }, [scope, user?.role]);
 
   useEffect(() => {
     if (user?.id) reload();
     else { setSubscription(null); setInfo(emptyInfo); setInfoLoaded(false); setReady(false); setDocuments({}); setPrefs(defaultPrefs()); setCollaborators([]); setInvitations([]); }
   }, [user?.id, reload]);
 
-  const refreshCollabs = async () => setCollaborators(await settingsService.listCollaborators());
+  const refreshCollabs = async () => {
+    if (scope !== 'owner' || user?.role !== 'user') return;
+    setCollaborators(await settingsService.listCollaborators());
+  };
   const refreshInvites = async () => setInvitations(await settingsService.listInvitations());
   const refreshSub = async () => setSubscription(await settingsService.getMySubscription());
 

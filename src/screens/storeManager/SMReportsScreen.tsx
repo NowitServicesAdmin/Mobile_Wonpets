@@ -6,7 +6,7 @@ import { Empty } from '../../components/ui';
 import { DashboardSkeleton } from '../../components/Skeletons';
 import { toast } from '../../components/WonPetsAlert';
 import SegmentedTabs from '../../components/common/SegmentedTabs';
-import { Panel, PanelHeader, WebStatGrid } from '../../components/doctor/DoctorUI';
+import { Panel, PanelHeader, PageHeader, WebStatGrid } from '../../components/doctor/DoctorUI';
 import { AreaChart, Bar, LoadError, inr0 } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { Reports, smService } from '../../services/storeManager.service';
@@ -56,6 +56,7 @@ export default function SMReportsScreen() {
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 gap-4 pb-10"
       refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}>
+      <PageHeader icon="bar-chart" title="Reports & Analytics" subtitle="Sales performance for your store." />
       <WebStatGrid stats={[
         { title: 'Revenue', value: inr0(s.revenue), icon: 'cash', tone: 'green', caption: 'Delivered revenue' },
         { title: 'Orders', value: s.orders, icon: 'bag-check', tone: 'blue', caption: 'Completed orders' },
@@ -78,10 +79,10 @@ export default function SMReportsScreen() {
           <View className="gap-3">
             {r.topProducts.map((p, i) => (
               <View key={p.id} className="flex-row items-center gap-3">
-                <View className="w-8 h-8 rounded-xl bg-orange-100 items-center justify-center"><Text className="font-black text-orange-600">{i + 1}</Text></View>
+                <View className="w-8 h-8 rounded-full bg-orange-100 items-center justify-center"><Text className="font-black text-orange-600">{i + 1}</Text></View>
                 <View className="flex-1">
-                  <Text className="font-semibold text-slate-800" numberOfLines={1}>{p.name}</Text>
-                  <Text className="text-[11px] text-slate-500">{p.sold} sold</Text>
+                  <Text className="font-semibold text-ink" numberOfLines={1}>{p.name}</Text>
+                  <Text className="text-[11px] text-muted">{p.sold} sold</Text>
                   <Bar ratio={p.revenue / topMax} className="mt-1" />
                 </View>
                 <Text className="font-bold text-green-600">{inr0(p.revenue)}</Text>
@@ -95,9 +96,9 @@ export default function SMReportsScreen() {
         <PanelHeader icon="download" tone="blue" title="Export" caption="Send the report to email, WhatsApp, Drive…" />
         <View className="gap-2.5">
           {([['text', 'Share report', 'Readable summary of this report', 'document-text', '#EF4444', '#FEE2E2'], ['csv', 'Share as CSV', 'Opens in Excel or Google Sheets', 'grid', '#16A34A', '#DCFCE7']] as const).map(([k, title, hint, icon, fg, bg]) => (
-            <Pressable key={k} onPress={() => share(k)} accessibilityRole="button" className="flex-row items-center gap-3 rounded-2xl border border-slate-100 p-3 active:bg-orange-50">
+            <Pressable key={k} onPress={() => share(k)} accessibilityRole="button" className="flex-row items-center gap-3 rounded-2xl border border-line p-3 active:bg-primary-soft">
               <View style={{ backgroundColor: bg }} className="w-11 h-11 rounded-xl items-center justify-center"><Ionicons name={icon} size={20} color={fg} /></View>
-              <View className="flex-1"><Text className="font-bold text-slate-800">{title}</Text><Text className="text-xs text-slate-500">{hint}</Text></View>
+              <View className="flex-1"><Text className="font-bold text-ink">{title}</Text><Text className="text-xs text-muted">{hint}</Text></View>
               <Ionicons name="share-outline" size={19} color={colors.muted} />
             </Pressable>
           ))}

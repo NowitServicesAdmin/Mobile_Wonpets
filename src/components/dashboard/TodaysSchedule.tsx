@@ -5,6 +5,7 @@ import { colors } from '../../theme';
 import { Card, T, cn } from '../ui';
 import PetAvatar from '../PetAvatar';
 import ProgressRing from '../ProgressRing';
+import CompletableRow, { AllDoneNote } from './CompletableRow';
 import type { Pet } from '../../data/mock';
 import type { ScheduleItem } from '../../context/PetsContext';
 
@@ -126,15 +127,17 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
             nestedScrollEnabled
             showsVerticalScrollIndicator
             style={{ maxHeight: TASK_LIST_MAX_HEIGHT }}
-            contentContainerStyle={{ gap: 8 }}
+            contentContainerStyle={{ paddingBottom: 0 }}
           >
             {tasks.map((task) => {
               const st = itemStyle(task);
               const isAppt = task.itemType === 'appointment';
               const isCustom = task.itemType === 'custom-task';
+              // a completed task animates out of the list and is then hidden
               const isDone = task.status === 'completed';
               return (
-                <View key={`${task.itemType}-${task.id}`} className={cn('flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', isDone ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
+                <CompletableRow key={`${task.itemType}-${task.id}`} done={isDone}>
+                <View className={cn('flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', isDone ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
                   <View className={cn('w-10 h-10 rounded-xl items-center justify-center', st.box)}><Ionicons name={st.icon} size={19} color={st.fg} /></View>
                   <View className="flex-1">
                     <Text maxFontSizeMultiplier={1.1} className={cn('text-[14px] font-extrabold', isDone ? 'line-through text-muted' : 'text-ink')} numberOfLines={1}>{task.title}</Text>
@@ -160,9 +163,11 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
                     </Pressable>
                   )}
                 </View>
+                </CompletableRow>
               );
             })}
           </ScrollView>
+          <AllDoneNote show={tasks.every((t) => t.status === 'completed')} />
 
           {/* Bottom summary */}
           <View className="flex-row gap-2 mt-3 pt-3.5 border-t border-orange-100">

@@ -8,7 +8,7 @@ import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
 import SearchBar from '../../components/common/SearchBar';
 import BottomSheet from '../../components/common/BottomSheet';
 import CustomDropdown from '../../components/CustomDropdown';
-import { TONES, DTone } from '../../components/doctor/DoctorUI';
+import { PageHeader, TONES, WebStatGrid, DTone } from '../../components/doctor/DoctorUI';
 import { Badge, ChoiceRow, Fab, FieldLabel, LoadError, RowAction } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { errorMessage } from '../../services/api';
@@ -82,15 +82,8 @@ export default function SMCategoriesScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}
         ListHeaderComponent={
           <View className="gap-3.5 mb-1">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2.5 pr-2">
-              {stats.map((s) => (
-                <View key={s.label} className="w-[116px] bg-white rounded-2xl border border-orange-100 p-3">
-                  <View className={cn('w-9 h-9 rounded-xl items-center justify-center mb-1.5', TONES[s.tone].soft)}><Ionicons name={s.icon} size={17} color={TONES[s.tone].fg} /></View>
-                  <Text className="text-[18px] font-black text-slate-800" numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
-                  <Text className="text-[11px] text-slate-500">{s.label}</Text>
-                </View>
-              ))}
-            </ScrollView>
+            <PageHeader icon="grid" title="Categories" subtitle="Organise your products and pets." />
+            <WebStatGrid stats={stats.map((x) => ({ title: x.label, value: x.value, icon: x.icon, tone: x.tone }))} />
             <SearchBar value={search} onChangeText={setSearch} placeholder="Search categories…" />
           </View>
         }
@@ -100,20 +93,20 @@ export default function SMCategoriesScreen({ navigation }: any) {
           const subs = !c.parent && c.type === 'pet' ? subsOf(c.id) : [];
           return (
             <Pressable onPress={() => navigation.navigate('SMProducts', { category: c.id, categoryName: c.name })} accessibilityRole="button" accessibilityLabel={c.name}
-              className="bg-white rounded-3xl border border-orange-100 p-3.5 active:bg-orange-50/40">
+              className="bg-white rounded-3xl border border-line p-3.5 active:bg-primary-soft">
               <View className="flex-row items-center gap-3">
-                <View className={cn('w-12 h-12 rounded-2xl items-center justify-center', TONES[tone].soft)}><Ionicons name={icon} size={22} color={TONES[tone].fg} /></View>
+                <View className={cn('w-12 h-12 rounded-full items-center justify-center', TONES[tone].soft)}><Ionicons name={icon} size={22} color={TONES[tone].fg} /></View>
                 <View className="flex-1">
-                  <Text className="text-[15px] font-extrabold text-slate-800" numberOfLines={1}>{c.name}</Text>
+                  <Text className="text-[15px] font-extrabold text-ink" numberOfLines={1}>{c.name}</Text>
                   <View className="flex-row items-center gap-1.5 mt-1">
                     <Badge label={c.type === 'pet' ? 'Pet' : 'Product'} tone={c.type === 'pet' ? 'amber' : 'blue'} />
-                    <Text className="text-[11.5px] text-slate-500">{c.products} product{c.products === 1 ? '' : 's'}</Text>
+                    <Text className="text-[11.5px] text-muted">{c.products} product{c.products === 1 ? '' : 's'}</Text>
                   </View>
                 </View>
                 <RowAction icon="create-outline" tone="blue" label={`Edit ${c.name}`} onPress={() => startEdit(c)} />
                 <RowAction icon="trash-outline" tone="red" label={`Delete ${c.name}`} onPress={() => remove(c)} />
               </View>
-              {!!c.description && <Text className="text-[12.5px] text-slate-500 mt-2" numberOfLines={2}>{c.description}</Text>}
+              {!!c.description && <Text className="text-[12.5px] text-muted mt-2" numberOfLines={2}>{c.description}</Text>}
               {!!c.parent && <Text className="text-[11.5px] text-orange-600 font-semibold mt-2">Subcategory of {parentName(c)}</Text>}
               {!c.parent && c.type === 'pet' && (
                 <View className="flex-row flex-wrap gap-1.5 mt-2.5">

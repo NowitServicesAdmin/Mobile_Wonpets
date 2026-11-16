@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { Anchor, measureAnchor, useAnchorRef } from './Popover';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
@@ -39,13 +40,15 @@ export default function TopBar({
   title, subtitle, actions = [], actionSize, className,
 }: {
   image?: string | null; emoji?: string; avatarSize?: number;
-  onAvatarPress?: () => void; avatarLabel?: string;
+  /** receives the avatar's on-screen rectangle so a popover can open right under it */
+  onAvatarPress?: (anchor: Anchor) => void; avatarLabel?: string;
   /** small icon bubble on the avatar (e.g. the account-switch swap icon) */
   avatarBadge?: IconName; avatarBadgeClassName?: string;
   title: React.ReactNode; subtitle?: React.ReactNode;
   actions?: TopBarAction[]; actionSize?: number; className?: string;
 }) {
   const insets = useSafeAreaInsets();
+  const avatarRef = useAnchorRef();
   const avatar = (
     <View className="rounded-full border-2 border-primary p-0.5">
       <Avatar image={image} emoji={emoji} size={avatarSize} />
@@ -60,7 +63,7 @@ export default function TopBar({
     <View style={{ paddingTop: insets.top + 8 }} className={cn('px-4 pb-3 bg-cream', className)}>
       <View className="flex-row items-center gap-2">
         {onAvatarPress
-          ? <Pressable onPress={onAvatarPress} accessibilityRole="button" accessibilityLabel={avatarLabel} className="active:opacity-80">{avatar}</Pressable>
+          ? <Pressable ref={avatarRef} collapsable={false} onPress={() => measureAnchor(avatarRef, onAvatarPress)} accessibilityRole="button" accessibilityLabel={avatarLabel} className="active:opacity-80">{avatar}</Pressable>
           : avatar}
         <View className="flex-1 ml-1">
           {typeof title === 'string' ? <Text className="text-[18px] font-black text-ink" numberOfLines={1}>{title}</Text> : title}

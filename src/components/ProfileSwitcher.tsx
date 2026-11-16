@@ -7,6 +7,7 @@ import { Avatar } from './Avatar';
 import { T, cn } from './ui';
 import { useAuth } from '../context/AuthContext';
 import { useManaged } from '../context/ManagedContext';
+import Popover, { Anchor } from './common/Popover';
 
 function Row({ active, onPress, title, subtitle, icon, image }: { active: boolean; onPress: () => void; title: string; subtitle: string; icon?: keyof typeof Ionicons.glyphMap; image?: string }) {
   return (
@@ -30,8 +31,32 @@ function Row({ active, onPress, title, subtitle, icon, image }: { active: boolea
   );
 }
 
-/** Bottom sheet: pick My Account or the pets shared with you (same choices as the web navbar's "Switch Account"). */
-export default function ProfileSwitcher({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+/** Compact row used inside the dropdown. */
+function MenuItem({ active, onPress, title, subtitle, icon, image }: { active: boolean; onPress: () => void; title: string; subtitle: string; icon?: keyof typeof Ionicons.glyphMap; image?: string }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      className={cn('flex-row items-center gap-2.5 rounded-xl px-2.5 py-2 active:bg-cream', active && 'bg-primary-soft')}
+    >
+      {icon ? (
+        <View className="w-9 h-9 rounded-full bg-primary-soft items-center justify-center"><Ionicons name={icon} size={17} color={colors.primary} /></View>
+      ) : (
+        <Avatar image={image} emoji="🦅" size={36} />
+      )}
+      <View className="flex-1">
+        <Text numberOfLines={1} className="text-[14px] font-bold text-ink">{title}</Text>
+        <Text numberOfLines={1} className="text-[11.5px] text-muted">{subtitle}</Text>
+      </View>
+      {active && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+    </Pressable>
+  );
+}
+
+/** Pick My Account or the pets shared with you (same choices as the web navbar's "Switch Account").
+ *  With an `anchor` (the header avatar) it drops down right under it; without one it is a bottom sheet. */
+export default function ProfileSwitcher({ visible, onClose, anchor }: { visible: boolean; onClose: () => void; anchor?: Anchor | null }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { accounts, isManaged, enterManaged, exitManaged } = useManaged();
@@ -42,6 +67,27 @@ export default function ProfileSwitcher({ visible, onClose }: { visible: boolean
     onClose();
     if (managed !== isManaged) (managed ? enterManaged : exitManaged)();
   };
+
+  if (anchor) {
+    return (
+      <Popover visible={visible} onClose={onClose} anchor={anchor} width={290}>
+        <Text className="text-[10.5px] font-extrabold text-muted uppercase tracking-wider px-2.5 pt-1 pb-1.5">Switch account</Text>
+        <MenuItem active={!isManaged} onPress={() => pick(false)} title={user?.name || 'My account'} subtitle="My Account" image={user?.profileImage} />
+        {accounts.length > 0 && (
+          <>
+            <View className="h-px bg-line my-1.5 mx-2" />
+            <MenuItem
+              active={isManaged}
+              onPress={() => pick(true)}
+              icon="swap-horizontal"
+              title="All shared pets"
+              subtitle={`${petCount} pet${petCount === 1 ? '' : 's'} · from ${owners.join(', ')}`}
+            />
+          </>
+        )}
+      </Popover>
+    );
+  }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>

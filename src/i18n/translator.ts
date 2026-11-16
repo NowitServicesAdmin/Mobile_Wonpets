@@ -5,7 +5,7 @@ import { TRANSLATE_API_KEY } from '../config/env';
  * Mobile equivalent of the web's Google Translate widget.
  *
  * The web translates the rendered page in the browser. React Native has no page to translate, so every <Text> and
- * TextInput placeholder asks this module for its translation (see installTranslation.ts). Missing strings are
+ * TextInput placeholder asks this module for its translation (see installTranslation.tsx). Missing strings are
  * collected, sent to Google Cloud Translation in small batches, cached (memory + AsyncStorage) and the screen
  * refreshes itself. English is the source language, exactly like the web's `googtrans=/en/<code>` cookie.
  */
@@ -29,7 +29,8 @@ const listeners = new Set<Listener>();
 const cache: Record<string, Record<string, string>> = {};
 const pending = new Set<string>();
 const inflight = new Set<string>();
-const failed = new Set<string>(); // not retried until the language changes
+const failedAt = new Map<string, number>(); // a string that failed is retried after RETRY_AFTER_MS (or when the language changes)
+const RETRY_AFTER_MS = 20000;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -50,7 +51,8 @@ export function tr(text: string): string {
   if (current === 'en' || !needsTranslation(text) || (!TRANSLATE_API_KEY && text.length > MAX_FREE_CHARS)) return text;
   const hit = cache[current]?.[text];
   if (hit !== undefined) return hit;
-  if (!inflight.has(text) && !failed.has(text)) { pending.add(text); schedule(); }
+  const failedWhen = failedAt.get(text);
+  if (!inflight.has(text) && (failedWhen === undefined || Date.now() - failedWhen > RETRY_AFTER_MS)) { pending.add(text); schedule(); }
   return text;
 }
 
@@ -83,6 +85,7 @@ async function translateOfficial(batch: string[], lang: string): Promise<(string
 async function translateFree(batch: string[], lang: string): Promise<(string | undefined)[]> {
   const out: (string | undefined)[] = new Array(batch.length).fill(undefined);
   let next = 0;
+  let firstError: Error | null = null;
   const worker = async () => {
     while (next < batch.length) {
       const i = next++;
@@ -92,11 +95,12 @@ async function translateFree(batch: string[], lang: string): Promise<(string | u
         const json = await res.json();
         out[i] = (json?.[0] ?? []).map((seg: any[]) => seg?.[0] ?? '').join('') || undefined;
       } catch (e: any) {
-        if (!out.some((v) => v !== undefined) && i === 0) throw e; // nothing worked at all -> surface the error
+        firstError ??= e;
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(FREE_PARALLEL, batch.length) }, worker));
+  if (batch.length && out.every((v) => v === undefined)) throw firstError ?? new Error('Translation failed'); // nothing worked at all -> surface the error
   return out;
 }
 
@@ -109,12 +113,16 @@ async function flush() {
     const out = TRANSLATE_API_KEY ? await translateOfficial(batch, lang) : await translateFree(batch, lang);
     if (lang === current) { // ignore answers that arrive after the user switched language again
       const store = (cache[lang] ??= {});
-      batch.forEach((s, i) => { store[s] = out[i] ?? s; });
+      batch.forEach((s, i) => {
+        const t = out[i];
+        if (t !== undefined) store[s] = t;
+        else failedAt.set(s, Date.now()); // do NOT cache the English text as the translation - it would stay untranslated forever
+      });
       lastError = null;
       persist(lang);
     }
   } catch (e: any) {
-    batch.forEach((s) => failed.add(s));
+    batch.forEach((s) => failedAt.set(s, Date.now()));
     lastError = e?.message || 'Translation failed';
   } finally {
     batch.forEach((s) => inflight.delete(s));
@@ -136,7 +144,7 @@ export async function setLanguageCode(code: string) {
   await loadCache(code);
   current = code;
   pending.clear();
-  failed.clear();
+  failedAt.clear();
   lastError = null;
   AsyncStorage.setItem(LANG_KEY, code).catch(() => {});
   emit();

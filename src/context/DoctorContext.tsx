@@ -45,6 +45,7 @@ export function DoctorProvider({ children }: { children: React.ReactNode }) {
   const lastUnread = useRef(0);
   const lastFull = useRef(0);
   const busy = useRef(false);
+  const queued = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshProfile = useCallback(async () => {
     try { const p = await doctorService.profile(); setProfile(p); setStatusState(p.status); } catch { /* keep what we have */ }
@@ -83,11 +84,16 @@ export function DoctorProvider({ children }: { children: React.ReactNode }) {
     refreshProfile();
     pollRef.current();
     const socket: Socket = io(API_ORIGIN, { auth: { token: tokenStore.get() }, transports: ['websocket'], reconnection: true, reconnectionDelay: 1500 });
-    EVENTS.forEach((e) => socket.on(e, () => syncRef.current()));
+    // a burst of server events (several notifications at once) becomes ONE refresh, not one per event
+    const queueSync = () => {
+      if (queued.current) return;
+      queued.current = setTimeout(() => { queued.current = null; syncRef.current(); }, 1500);
+    };
+    EVENTS.forEach((e) => socket.on(e, queueSync));
     socket.on('connect', () => pollRef.current());
     const timer = setInterval(() => { if (AppState.currentState === 'active') pollRef.current(); }, POLL_MS);
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active') syncRef.current(); });
-    return () => { socket.removeAllListeners(); socket.disconnect(); clearInterval(timer); sub.remove(); };
+    return () => { socket.removeAllListeners(); socket.disconnect(); clearInterval(timer); sub.remove(); if (queued.current) { clearTimeout(queued.current); queued.current = null; } };
   }, [user?.id, refreshProfile]);
 
   const value = useMemo(() => ({ profile, status, setStatus, unread, tick, syncNow, refreshProfile }), [profile, status, setStatus, unread, tick, syncNow, refreshProfile]);

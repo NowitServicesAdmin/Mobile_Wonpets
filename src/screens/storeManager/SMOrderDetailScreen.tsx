@@ -85,9 +85,9 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
           <View className="flex-row items-center gap-3">
             <Avatar image={o.customer.image} emoji="🧑" size={46} />
             <View className="flex-1">
-              <Text className="font-bold text-slate-800" numberOfLines={1}>{o.customer.name}</Text>
-              {!!o.customer.email && <Text className="text-xs text-slate-500" numberOfLines={1}>{o.customer.email}</Text>}
-              {!!o.customer.phone && <Text className="text-xs text-slate-500">{o.customer.phone}</Text>}
+              <Text className="font-bold text-ink" numberOfLines={1}>{o.customer.name}</Text>
+              {!!o.customer.email && <Text className="text-xs text-muted" numberOfLines={1}>{o.customer.email}</Text>}
+              {!!o.customer.phone && <Text className="text-xs text-muted">{o.customer.phone}</Text>}
             </View>
             <Pressable onPress={() => call(o.customer.phone || o.address?.phone)} accessibilityLabel="Call customer" className="w-10 h-10 rounded-xl bg-green-50 items-center justify-center active:opacity-70"><Ionicons name="call" size={17} color={colors.green} /></Pressable>
             <Pressable onPress={() => mail(o.customer.email)} accessibilityLabel="Email customer" className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center active:opacity-70"><Ionicons name="mail" size={17} color={colors.blue} /></Pressable>
@@ -99,11 +99,11 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
           <PanelHeader icon="bag-handle" title="Ordered Products" caption={`${o.items.reduce((s, i) => s + i.qty, 0)} unit(s)`} />
           <View className="gap-2.5">
             {o.items.map((i) => (
-              <View key={i.id} className="flex-row gap-3 border border-orange-100 rounded-2xl p-2.5">
+              <View key={i.id} className="flex-row gap-3 border border-line rounded-2xl p-2.5">
                 <Avatar image={i.image} emoji="📦" size={58} square />
                 <View className="flex-1 justify-center">
-                  <Text className="font-semibold text-slate-800" numberOfLines={2}>{i.name}</Text>
-                  <Text className="text-xs text-slate-500 mt-0.5">Qty {i.qty} × {inr0(i.price)}</Text>
+                  <Text className="font-semibold text-ink" numberOfLines={2}>{i.name}</Text>
+                  <Text className="text-xs text-muted mt-0.5">Qty {i.qty} × {inr0(i.price)}</Text>
                 </View>
                 <Text className="font-bold text-green-600 self-center">{inr0(i.qty * i.price)}</Text>
               </View>
@@ -119,7 +119,7 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
             {o.deliveryCharge > 0 && <Row k="Delivery" v={inr0(o.deliveryCharge)} />}
             <Row k="Shipping" v={inr0(o.shippingCharge)} />
             <Row k={o.couponCode ? `Discount (${o.couponCode})` : 'Discount'} v={o.discount ? `− ${inr0(o.discount)}` : inr0(0)} />
-            <View className="border-t border-orange-100 pt-2.5 flex-row justify-between">
+            <View className="border-t border-line pt-2.5 flex-row justify-between">
               <Text className="text-[16px] font-extrabold text-ink">Total</Text>
               <Text className="text-[16px] font-extrabold text-green-600">{inr0(o.total)}</Text>
             </View>
@@ -134,9 +134,9 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
         {!!o.address && (
           <Panel>
             <PanelHeader icon="location" tone="red" title="Shipping Address" />
-            <Text className="font-bold text-slate-800">{o.address.fullName}</Text>
-            <Text className="text-[13px] text-slate-600 leading-5 mt-1">{[o.address.doorNo, o.address.formattedAddress].filter(Boolean).join(', ')}</Text>
-            {!!o.address.landmark && <Text className="text-xs text-slate-500 mt-0.5">Near {o.address.landmark}</Text>}
+            <Text className="font-bold text-ink">{o.address.fullName}</Text>
+            <Text className="text-[13px] text-muted leading-5 mt-1">{[o.address.doorNo, o.address.formattedAddress].filter(Boolean).join(', ')}</Text>
+            {!!o.address.landmark && <Text className="text-xs text-muted mt-0.5">Near {o.address.landmark}</Text>}
             {!!o.address.phone && (
               <Pressable onPress={() => call(o.address?.phone)} className="flex-row items-center gap-1.5 mt-2 self-start"><Ionicons name="call-outline" size={14} color={colors.primary} /><Text className="text-primary font-bold text-[13px]">{o.address.phone}</Text></Pressable>
             )}
@@ -169,7 +169,7 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
 }
 
 const Row = ({ k, v }: { k: string; v: string }) => (
-  <View className="flex-row justify-between"><Text className="text-slate-500">{k}</Text><Text className="text-slate-800 font-semibold">{v}</Text></View>
+  <View className="flex-row justify-between"><Text className="text-muted">{k}</Text><Text className="text-ink font-semibold">{v}</Text></View>
 );
 
 /** Courier shipment panel - the web ShipmentCard. Self-delivery (live pets / courier off) just explains what to do. */
@@ -182,9 +182,9 @@ function ShipmentPanel({ o, onChanged, onFixAddress }: { o: SMOrder; onChanged: 
     return (
       <Panel>
         <PanelHeader icon="car" title="Delivery" caption="You deliver this order yourself" />
-        <Text className="text-[13px] text-slate-600 leading-5">Mark it <Text className="font-bold">Shipped</Text> when it leaves and <Text className="font-bold">Delivered</Text> once the customer has it.</Text>
+        <Text className="text-[13px] text-muted leading-5">Mark it <Text className="font-bold">Shipped</Text> when it leaves and <Text className="font-bold">Delivered</Text> once the customer has it.</Text>
         {s.distanceKm != null && (
-          <Text className="text-[13px] text-slate-600 leading-5 mt-2">Customer is about <Text className="font-bold">{s.distanceKm} km</Text> from your store and paid <Text className="font-bold">{inr0(o.shippingCharge)}</Text> delivery for this order.</Text>
+          <Text className="text-[13px] text-muted leading-5 mt-2">Customer is about <Text className="font-bold">{s.distanceKm} km</Text> from your store and paid <Text className="font-bold">{inr0(o.shippingCharge)}</Text> delivery for this order.</Text>
         )}
       </Panel>
     );
@@ -230,7 +230,7 @@ function ShipmentPanel({ o, onChanged, onFixAddress }: { o: SMOrder; onChanged: 
       <PanelHeader icon="car" title="Courier Shipment" />
       {s.sandbox && <View className="-mt-2 mb-2"><Badge label="TEST MODE" tone="purple" /></View>}
       <View className="gap-2">
-        <View className="flex-row justify-between gap-3"><Text className="text-slate-500">Status</Text><Text className={cn('font-bold', problem ? 'text-red-600' : 'text-slate-800')}>{SHIP_TEXT[status] || status}</Text></View>
+        <View className="flex-row justify-between gap-3"><Text className="text-muted">Status</Text><Text className={cn('font-bold', problem ? 'text-red-600' : 'text-ink')}>{SHIP_TEXT[status] || status}</Text></View>
         {!!s.courierName && <Row k="Courier" v={s.courierName} />}
         {!!s.awbCode && <Row k="AWB" v={s.awbCode} />}
         {!!s.shiprocketStatus && <Row k="Courier update" v={s.shiprocketStatus} />}
@@ -241,15 +241,15 @@ function ShipmentPanel({ o, onChanged, onFixAddress }: { o: SMOrder; onChanged: 
         <Pressable onPress={onFixAddress} className="flex-row items-center gap-1.5 mt-3 self-start"><Text className="text-primary font-bold text-[13px]">Add / fix pickup address</Text><Ionicons name="arrow-forward" size={13} color={colors.primary} /></Pressable>
       )}
       {o.status === 'Processing' && has && !s.pickupScheduled && (
-        <Text className="text-[13px] text-slate-600 leading-5 mt-3">Pack the order, print the label and stick it on the parcel, then tap <Text className="font-bold">Request pickup</Text> below.</Text>
+        <Text className="text-[13px] text-muted leading-5 mt-3">Pack the order, print the label and stick it on the parcel, then tap <Text className="font-bold">Request pickup</Text> below.</Text>
       )}
       <View className="flex-row flex-wrap gap-2 mt-3.5">
         {canRetry && btn('retry', 'Retry shipment', 'refresh', 'orange')}
         {has && o.status !== 'Cancelled' && btn('label', 'Print label', 'pricetag', 'cyan')}
         {has && !s.sandbox && ['Shipped', 'Processing'].includes(o.status) && btn('refresh', 'Refresh tracking', 'sync', 'slate')}
         {!!s.trackUrl && (
-          <Pressable onPress={() => Linking.openURL(s.trackUrl!)} className="flex-row items-center gap-1.5 px-3.5 h-10 rounded-xl bg-slate-100 active:opacity-70">
-            <Text className="text-slate-700 font-bold text-[13px]">Track</Text><Ionicons name="open-outline" size={13} color="#475569" />
+          <Pressable onPress={() => Linking.openURL(s.trackUrl!)} className="flex-row items-center gap-1.5 px-3.5 h-10 rounded-xl bg-line active:opacity-70">
+            <Text className="text-ink font-bold text-[13px]">Track</Text><Ionicons name="open-outline" size={13} color="#475569" />
           </Pressable>
         )}
       </View>

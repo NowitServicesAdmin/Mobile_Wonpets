@@ -45,6 +45,9 @@
         }
       ]
     ],
-    "scheme": "wonpet"
+        "scheme": [
+      "wonpet",
+      "com.wonpet.pro"
+    ]
   }
 }

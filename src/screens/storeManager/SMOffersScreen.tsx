@@ -8,7 +8,7 @@ import { WishlistSkeleton } from '../../components/Skeletons';
 import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
 import SearchBar from '../../components/common/SearchBar';
 import FilterChips from '../../components/common/FilterChips';
-import { WebStatGrid } from '../../components/doctor/DoctorUI';
+import { PageHeader, WebStatGrid } from '../../components/doctor/DoctorUI';
 import { Bar, Fab, LoadError, OFFER_COLOR, OfferBadge, RowAction, fmtDate, palette } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { errorMessage } from '../../services/api';
@@ -61,6 +61,7 @@ export default function SMOffersScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}
         ListHeaderComponent={
           <View className="gap-3.5 mb-1">
+            <PageHeader icon="pricetags" title="Coupons & Offers" subtitle="Run discounts and track how they perform." />
             <WebStatGrid stats={[
               { title: 'Active', value: s?.active ?? all.filter((o) => o.status === 'Active').length, icon: 'pricetags', tone: 'green', caption: 'Running campaigns', onPress: () => setFilter(['Active']) },
               { title: 'Scheduled', value: s?.scheduled ?? 0, icon: 'calendar', tone: 'blue', caption: 'Upcoming', onPress: () => setFilter(['Scheduled']) },
@@ -78,36 +79,36 @@ export default function SMOffersScreen({ navigation }: any) {
           const used = o.maxUsage ? o.usedCount / o.maxUsage : 0;
           return (
             <Pressable onPress={() => navigation.navigate('SMOfferForm', { id: o.id })} accessibilityRole="button" accessibilityLabel={`Offer ${o.code}`}
-              className={cn('bg-white rounded-3xl border border-orange-100 overflow-hidden active:opacity-90', o.status === 'Expired' && 'opacity-80')}>
+              className={cn('bg-white rounded-3xl border border-line overflow-hidden active:opacity-90', o.status === 'Expired' && 'opacity-80')}>
               <View style={{ backgroundColor: accent }} className="h-1.5" />
               <View className="p-3.5">
                 <View className="flex-row items-center gap-3">
                   <Avatar image={o.productImage} emoji="🏷️" size={52} square />
                   <View className="flex-1">
-                    <Text className="font-extrabold text-slate-800" numberOfLines={1}>{o.title || o.code}</Text>
+                    <Text className="font-extrabold text-ink" numberOfLines={1}>{o.title || o.code}</Text>
                     <View className="flex-row items-center gap-1.5 mt-0.5">
                       <View style={{ borderColor: accent }} className="border border-dashed rounded-md px-1.5 py-0.5"><Text style={{ color: accent }} className="font-black text-[12px] tracking-wider">{o.code}</Text></View>
                       <OfferBadge status={o.status} />
                     </View>
-                    {!!o.highlight && <Text className="text-[11px] text-orange-500 mt-0.5" numberOfLines={1}>{o.highlight}</Text>}
+                    {!!o.highlight && <Text className="text-[11px] text-primary mt-0.5" numberOfLines={1}>{o.highlight}</Text>}
                   </View>
                   <View className="items-end">
                     <Text style={{ color: accent }} className="text-[20px] font-black">{o.discountType === 'Flat' ? `₹${o.discount}` : `${o.discount}%`}</Text>
-                    <Text className="text-[10px] text-slate-400">{o.discountType === 'Flat' ? 'flat off' : 'off'}</Text>
+                    <Text className="text-[10px] text-muted">{o.discountType === 'Flat' ? 'flat off' : 'off'}</Text>
                   </View>
                 </View>
                 <View className="flex-row items-center gap-1.5 mt-3">
                   <Ionicons name="calendar-outline" size={13} color={colors.muted} />
-                  <Text className="text-[12px] text-slate-500 flex-1">{fmtDate(o.startDate)} → {fmtDate(o.endDate)}</Text>
-                  {o.minimumOrderAmount > 0 && <Text className="text-[11px] text-slate-500">Min ₹{o.minimumOrderAmount}</Text>}
+                  <Text className="text-[12px] text-muted flex-1">{fmtDate(o.startDate)} → {fmtDate(o.endDate)}</Text>
+                  {o.minimumOrderAmount > 0 && <Text className="text-[11px] text-muted">Min ₹{o.minimumOrderAmount}</Text>}
                 </View>
                 <View className="mt-2.5">
-                  <View className="flex-row justify-between mb-1"><Text className="text-[11px] text-slate-500">Used {o.usedCount} / {o.maxUsage || '∞'}</Text><Text className="text-[11px] font-bold text-slate-600">{Math.round(used * 100)}%</Text></View>
+                  <View className="flex-row justify-between mb-1"><Text className="text-[11px] text-muted">Used {o.usedCount} / {o.maxUsage || '∞'}</Text><Text className="text-[11px] font-bold text-muted">{Math.round(used * 100)}%</Text></View>
                   <Bar ratio={used} color={accent} />
                 </View>
-                <View className="flex-row items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <View className="flex-row items-center gap-2 mt-3 pt-3 border-t border-line">
                   <Switch value={o.isActive} disabled={toggling === o.id} onValueChange={() => toggle(o)} trackColor={{ false: '#E5DDD3', true: colors.primary }} thumbColor="#fff" ios_backgroundColor="#E5DDD3" />
-                  <Text className="flex-1 text-[12.5px] font-semibold text-slate-600">{o.isActive ? 'Enabled' : 'Disabled'}</Text>
+                  <Text className="flex-1 text-[12.5px] font-semibold text-muted">{o.isActive ? 'Enabled' : 'Disabled'}</Text>
                   <RowAction icon="create-outline" tone="blue" label={`Edit ${o.code}`} onPress={() => navigation.navigate('SMOfferForm', { id: o.id })} />
                   <RowAction icon="trash-outline" tone="red" label={`Delete ${o.code}`} onPress={() => remove(o)} />
                 </View>

@@ -1,17 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  FlatList,
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { FlatList, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme";
-import { Empty, T, cn } from "../../components/ui";
+import { Empty, Gradient, SectionHeader, T, cn } from "../../components/ui";
+import SearchBar from "../../components/common/SearchBar";
+import FilterChips from "../../components/common/FilterChips";
+import SegmentedTabs from "../../components/common/SegmentedTabs";
+import StatRow from "../../components/common/StatTile";
 import { ListingCard } from "../../components/resell/ListingBits";
 import FilterSheet, {
   Filters,
@@ -41,47 +36,17 @@ const matchesTab = (l: Listing, tab: string) =>
       : l.category === tab);
 const TRENDING = ["Most Viewed", "Newest", "Near You"] as const;
 const PAGE_SIZE = 10; // listings revealed per scroll batch (even, so the 2-column grid stays full)
-const TAB_ICON: Record<string, IconName> = {
-  All: "apps",
-  Pets: "paw",
-  Accessories: "bag-handle",
-  Beds: "bed",
-  Grooming: "cut",
-  More: "ellipsis-horizontal",
-};
 
-/** Section title with a tinted icon badge. */
-function SectionHeader({
-  title,
-  icon,
-  tint = "bg-primary-soft",
-  color = colors.primary,
-  count,
-}: {
-  title: string;
-  icon: IconName;
-  tint?: string;
-  color?: string;
-  count?: number;
-}) {
+/** Round tinted icon used in front of every section title (same as the Dashboard sections). */
+function IconBadge({ icon, tint, color }: { icon: IconName; tint: string; color: string }) {
   return (
-    <View className="flex-row items-center gap-2.5">
-      <View
-        className={cn("w-8 h-8 rounded-xl items-center justify-center", tint)}
-      >
-        <Ionicons name={icon} size={16} color={color} />
-      </View>
-      <Text className={T.h2}>{title}</Text>
-      {count !== undefined && (
-        <View className="bg-white border border-line rounded-full px-2 py-0.5">
-          <Text className="text-[11px] font-bold text-muted">{count}</Text>
-        </View>
-      )}
+    <View className={cn("w-9 h-9 rounded-full items-center justify-center", tint)}>
+      <Ionicons name={icon} size={17} color={color} />
     </View>
   );
 }
 
-/** Square-ish action tile used for Chats / Saved / My listings. */
+/** Tinted icon tile + label used for Chats / Saved / My listings. */
 function QuickAction({
   icon,
   label,
@@ -102,8 +67,10 @@ function QuickAction({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       className={cn(
-        "flex-1 items-center gap-1.5 rounded-3xl py-3 border active:opacity-90",
+        "flex-1 items-center gap-1.5 rounded-2xl py-2.5 border active:opacity-90",
         active ? "bg-primary border-primary" : "bg-white border-line",
       )}
     >
@@ -117,10 +84,7 @@ function QuickAction({
         {badge && <View className="absolute -top-1.5 -right-1.5">{badge}</View>}
       </View>
       <Text
-        className={cn(
-          "font-bold text-[12px]",
-          active ? "text-white" : "text-ink",
-        )}
+        className={cn("font-bold text-[12px]", active ? "text-white" : "text-ink")}
         numberOfLines={1}
       >
         {label}
@@ -145,14 +109,14 @@ function Rail({
   onOpen: (id: string) => void;
   right?: React.ReactNode;
   emptyText?: string;
-  tint?: string;
-  color?: string;
+  tint: string;
+  color: string;
 }) {
-  // keep the rail (and its filter chips) on screen when a chip has no results, otherwise the user can't switch back
+  // keep the rail (and its switcher) on screen when a tab has no results, otherwise the user can't switch back
   if (!data.length && !right) return null;
   return (
     <View className="gap-3">
-      <SectionHeader title={title} icon={icon} tint={tint} color={color} />
+      <SectionHeader title={title} icon={<IconBadge icon={icon} tint={tint} color={color} />} />
       {right}
       {!data.length ? (
         <View className="bg-white border border-dashed border-line rounded-3xl p-5 items-center">
@@ -164,15 +128,11 @@ function Rail({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-3 pr-4"
+          className="-mx-4 grow-0"
+          contentContainerClassName="gap-3 px-4 pb-1"
         >
           {data.map((l) => (
-            <ListingCard
-              key={l.id}
-              compact
-              item={l}
-              onPress={() => onOpen(l.id)}
-            />
+            <ListingCard key={l.id} compact item={l} onPress={() => onOpen(l.id)} />
           ))}
         </ScrollView>
       )}
@@ -204,21 +164,25 @@ export default function ResellScreen({ navigation }: any) {
     {
       label: "Pets",
       icon: "paw" as IconName,
+      color: colors.primary,
       value: available.filter((l) => l.listingType === "Pet").length,
     },
     {
       label: "Products",
       icon: "cube" as IconName,
+      color: colors.purple,
       value: available.filter((l) => l.listingType === "Product").length,
     },
     {
       label: "Sellers",
       icon: "people" as IconName,
+      color: colors.blue,
       value: new Set(available.map((l) => l.sellerId)).size,
     },
     {
       label: "New today",
       icon: "sparkles" as IconName,
+      color: colors.green,
       value: available.filter(
         (l) => Date.now() - new Date(l.createdAt).getTime() < 86400000,
       ).length,
@@ -296,6 +260,23 @@ export default function ResellScreen({ navigation }: any) {
     .filter(Boolean) as Listing[];
   const nFilters = activeFilterCount(filters);
   const browsing = !!q || tab !== "All" || nFilters > 0 || onlySaved;
+  const resetAll = () => {
+    setQ("");
+    setTab("All");
+    setFilters(noFilters);
+    setOnlySaved(false);
+  };
+
+  // category chips with live counts ("Pets · 12"); single-select on top of the shared multi-select FilterChips
+  const tabOptions = useMemo(
+    () =>
+      TABS.filter((t) => t !== "All").map((t) => ({
+        key: t as string,
+        label: t as string,
+        count: available.filter((l) => matchesTab(l, t)).length,
+      })),
+    [available],
+  );
 
   // infinite scroll: reveal PAGE_SIZE more listings as the user nears the end of the grid
   const [shown, setShown] = useState(PAGE_SIZE);
@@ -307,6 +288,7 @@ export default function ResellScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-cream">
       <FlatList
+        className="flex-1"
         data={pageItems}
         keyExtractor={(l) => l.id}
         numColumns={2}
@@ -314,13 +296,11 @@ export default function ResellScreen({ navigation }: any) {
         onEndReachedThreshold={0.5}
         refreshing={loading}
         onRefresh={refresh}
-        columnWrapperClassName="gap-3 px-4"
-        contentContainerClassName="pb-28"
+        columnWrapperClassName="gap-3"
+        contentContainerClassName="p-4 pb-28"
         ListEmptyComponent={
           loading && !listings.length ? (
-            <View className="px-4">
-              <ListingGridSkeleton count={6} />
-            </View>
+            <ListingGridSkeleton count={6} />
           ) : (
             <Empty
               emoji="🔍"
@@ -330,295 +310,173 @@ export default function ResellScreen({ navigation }: any) {
           )
         }
         ListHeaderComponent={
-          <View className="gap-5 mb-4">
-            {/* Hero: title + search */}
-            <LinearGradient
-              colors={["#FF8A2B", "#FF6B00", "#E85D00"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              className="px-4 pt-5 pb-6 rounded-b-[32px] gap-4"
+          <View className="gap-4 mb-3">
+            {/* hero card */}
+            <Gradient
+              className="rounded-3xl p-4 overflow-hidden"
+              colorsArr={["#FF6B00", "#F59E0B"]}
             >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 pr-3">
-                  <Text className="text-white text-2xl font-black">
-                    Marketplace
+              <View className="flex-row items-center gap-3">
+                <View className="flex-1 gap-1">
+                  <View className="self-start flex-row items-center gap-1.5 bg-white/25 rounded-full px-2.5 py-1">
+                    <Ionicons name="storefront" size={12} color="#fff" />
+                    <Text className="text-white text-[11px] font-extrabold uppercase tracking-wider">
+                      WONPET Marketplace
+                    </Text>
+                  </View>
+                  <Text className="text-white text-xl font-black mt-1">
+                    Find a new best friend
                   </Text>
-                  <Text className="text-white/85 text-[13px] mt-0.5">
-                    Find a new best friend or pre-loved pet gear
+                  <Text className="text-white/90 text-[13px]">
+                    Pets &amp; pre-loved gear from owners near you
                   </Text>
                 </View>
-                <View className="w-12 h-12 rounded-2xl bg-white items-center justify-center overflow-hidden">
+                <View className="w-14 h-14 rounded-2xl bg-white items-center justify-center overflow-hidden">
                   <Image
                     source={require("../../assets/logo.png")}
-                    style={{ width: 40, height: 40 }}
+                    style={{ width: 44, height: 44 }}
                     resizeMode="contain"
                   />
                 </View>
               </View>
-              <View className="flex-row items-center gap-2.5">
-                <View className="flex-1 flex-row items-center gap-2 bg-white rounded-2xl px-3.5 shadow-sm">
-                  <Ionicons name="search" size={18} color={colors.primary} />
-                  <TextInput
-                    value={q}
-                    onChangeText={setQ}
-                    placeholder="Search pets, products, breeds…"
-                    placeholderTextColor="#B8AEA5"
-                    className="flex-1 py-3.5"
-                  />
-                  {!!q && (
-                    <Pressable hitSlop={8} onPress={() => setQ("")}>
-                      <Ionicons
-                        name="close-circle"
-                        size={18}
-                        color={colors.muted}
-                      />
-                    </Pressable>
-                  )}
-                </View>
-                <Pressable
-                  onPress={() => setFilterOpen(true)}
-                  className={cn(
-                    "w-[50px] h-[50px] rounded-2xl items-center justify-center shadow-sm",
-                    nFilters > 0 ? "bg-ink" : "bg-white",
-                  )}
-                >
-                  <Ionicons
-                    name="options"
-                    size={20}
-                    color={nFilters > 0 ? "#fff" : colors.primary}
-                  />
-                  {nFilters > 0 && (
-                    <View className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-yellow border-2 border-white items-center justify-center">
-                      <Text className="text-white text-[10px] font-extrabold">
-                        {nFilters}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-              </View>
-            </LinearGradient>
+            </Gradient>
 
-            <View className="px-4 gap-5">
-              {/* Quick actions */}
-              <View className="flex-row gap-3">
-                <QuickAction
-                  icon="chatbubble-ellipses"
-                  label="Chats"
-                  onPress={() => navigation.navigate("Chat", { tab: "resell" })}
-                  badge={
-                    <UnreadBadge
-                      count={unreadByKind.resell}
-                      className="bg-red"
+            {/* quick actions */}
+            <View className="flex-row gap-2">
+              <QuickAction
+                icon="chatbubble-ellipses"
+                label="Chats"
+                onPress={() => navigation.navigate("Chat", { tab: "resell" })}
+                badge={
+                  <UnreadBadge
+                    count={unreadByKind.resell}
+                    className="bg-red"
+                  />
+                }
+              />
+              <QuickAction
+                icon={onlySaved ? "heart" : "heart-outline"}
+                label={`Saved (${favourites.length})`}
+                active={onlySaved}
+                onPress={() => setOnlySaved((v) => !v)}
+                iconColor={colors.red}
+                tint="bg-red-soft"
+              />
+              <QuickAction
+                icon="pricetags"
+                label="My listings"
+                onPress={() => navigation.navigate("MyListings")}
+                iconColor={colors.purple}
+                tint="bg-purple-soft"
+              />
+            </View>
+
+            {/* stats */}
+            {!browsing && <StatRow stats={stats} />}
+
+            {/* search + filters */}
+            <SearchBar
+              value={q}
+              onChangeText={setQ}
+              placeholder="Search pets, products, breeds…"
+              trailing={{
+                icon: "options-outline",
+                label: "Filters",
+                badge: nFilters,
+                onPress: () => setFilterOpen(true),
+              }}
+            />
+
+            {/* category chips */}
+            <FilterChips
+              options={tabOptions}
+              active={tab === "All" ? [] : [tab]}
+              onChange={(next) => setTab(next.length ? next[next.length - 1] : "All")}
+              allCount={available.length}
+            />
+
+            {!browsing && (
+              <>
+                <Rail
+                  title="Trending This Week"
+                  icon="flame"
+                  tint="bg-red-soft"
+                  color={colors.red}
+                  data={trendingList}
+                  onOpen={open}
+                  emptyText={
+                    trending === "Near You"
+                      ? nearLabel
+                        ? `No listings near ${nearLabel} yet. Try Most Viewed or Newest.`
+                        : "Turn on location access (or save your location in Settings) to see listings near you."
+                      : undefined
+                  }
+                  right={
+                    <SegmentedTabs
+                      value={trending}
+                      onChange={setTrending}
+                      tabs={TRENDING.map((t) => ({ key: t, label: t }))}
                     />
                   }
                 />
-                <QuickAction
-                  icon={onlySaved ? "heart" : "heart-outline"}
-                  label={`Saved (${favourites.length})`}
-                  active={onlySaved}
-                  onPress={() => setOnlySaved((v) => !v)}
-                  iconColor={colors.red}
-                  tint="bg-red-soft"
+                <Rail
+                  title="Featured Listings"
+                  icon="star"
+                  tint="bg-yellow-soft"
+                  color={colors.yellow}
+                  data={featured}
+                  onOpen={open}
                 />
-                <QuickAction
-                  icon="pricetags"
-                  label="My listings"
-                  onPress={() => navigation.navigate("MyListings")}
-                  iconColor={colors.purple}
-                  tint="bg-purple-soft"
-                />
-              </View>
+              </>
+            )}
 
-              {/* Stats */}
-              {!browsing && (
-                <View className="flex-row bg-white border border-line rounded-3xl py-3.5">
-                  {stats.map((s, i) => (
-                    <View
-                      key={s.label}
-                      className={cn(
-                        "flex-1 items-center gap-0.5",
-                        i > 0 && "border-l border-line",
-                      )}
-                    >
-                      <Ionicons
-                        name={s.icon}
-                        size={14}
-                        color={colors.primary}
-                      />
-                      <Text className="text-lg font-black text-ink">
-                        {s.value}
-                      </Text>
-                      <Text className="text-[10px] text-muted font-semibold">
-                        {s.label}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Category tabs */}
+            {/* all listings header + sort */}
+            <View className="gap-3">
+              <SectionHeader
+                title={`${onlySaved ? "Saved" : "All"} Listings`}
+                subtitle={`${list.length} listing${list.length === 1 ? "" : "s"}`}
+                icon={
+                  <IconBadge
+                    icon={onlySaved ? "heart" : "grid"}
+                    tint={onlySaved ? "bg-red-soft" : "bg-primary-soft"}
+                    color={onlySaved ? colors.red : colors.primary}
+                  />
+                }
+                right={
+                  browsing ? (
+                    <Pressable hitSlop={8} onPress={resetAll}>
+                      <Text className="text-primary font-bold text-[13px]">Reset filters</Text>
+                    </Pressable>
+                  ) : undefined
+                }
+              />
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerClassName="gap-2 pr-4"
-                className="-mx-4 px-4 grow-0"
+                className="-mx-4 grow-0"
+                contentContainerClassName="gap-2 px-4 items-center"
               >
-                {TABS.map((t) => {
-                  const on = tab === t;
-                  return (
-                    <Pressable
-                      key={t}
-                      onPress={() => setTab(t)}
+                <Ionicons name="swap-vertical" size={16} color={colors.muted} />
+                {SORT_OPTIONS.map((s) => (
+                  <Pressable
+                    key={s}
+                    onPress={() => setSort(s)}
+                    className={cn(
+                      "px-3.5 py-2 rounded-full border",
+                      sort === s ? "bg-ink border-ink" : "bg-white border-line",
+                    )}
+                  >
+                    <Text
                       className={cn(
-                        "flex-row items-center gap-1.5 pl-2.5 pr-4 py-2 rounded-full border",
-                        on
-                          ? "bg-primary border-primary"
-                          : "bg-white border-line",
+                        "font-bold text-[13px]",
+                        sort === s ? "text-white" : "text-ink",
                       )}
-                      style={
-                        on
-                          ? {
-                              elevation: 3,
-                              shadowColor: "#C2410C",
-                              shadowOpacity: 0.2,
-                              shadowRadius: 6,
-                              shadowOffset: { width: 0, height: 2 },
-                            }
-                          : undefined
-                      }
                     >
-                      <View
-                        className={cn(
-                          "w-6 h-6 rounded-full items-center justify-center",
-                          on ? "bg-white/25" : "bg-primary-soft",
-                        )}
-                      >
-                        <Ionicons
-                          name={TAB_ICON[t] ?? "ellipse"}
-                          size={13}
-                          color={on ? "#fff" : colors.primary}
-                        />
-                      </View>
-                      <Text
-                        className={cn(
-                          "font-bold text-xs",
-                          on ? "text-white" : "text-ink",
-                        )}
-                      >
-                        {t}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                      {s}
+                    </Text>
+                  </Pressable>
+                ))}
               </ScrollView>
-
-              {!browsing && (
-                <>
-                  <Rail
-                    title="Trending This Week"
-                    icon="flame"
-                    tint="bg-red-soft"
-                    color={colors.red}
-                    data={trendingList}
-                    onOpen={open}
-                    emptyText={
-                      trending === "Near You"
-                        ? nearLabel
-                          ? `No listings near ${nearLabel} yet. Try Most Viewed or Newest.`
-                          : "Turn on location access (or save your location in Settings) to see listings near you."
-                        : undefined
-                    }
-                    right={
-                      <View className="flex-row bg-primary-soft rounded-2xl p-1">
-                        {TRENDING.map((t) => (
-                          <Pressable
-                            key={t}
-                            onPress={() => setTrending(t)}
-                            className={cn(
-                              "flex-1 items-center py-2 rounded-xl",
-                              trending === t ? "bg-white" : "bg-transparent",
-                            )}
-                            style={
-                              trending === t
-                                ? {
-                                    elevation: 2,
-                                    shadowColor: "#000",
-                                    shadowOpacity: 0.08,
-                                    shadowRadius: 4,
-                                    shadowOffset: { width: 0, height: 1 },
-                                  }
-                                : undefined
-                            }
-                          >
-                            <Text
-                              className={cn(
-                                "text-xs font-bold",
-                                trending === t
-                                  ? "text-primary-dark"
-                                  : "text-muted",
-                              )}
-                            >
-                              {t}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    }
-                  />
-                  <Rail
-                    title="Featured Listings"
-                    icon="star"
-                    tint="bg-yellow-soft"
-                    color={colors.yellow}
-                    data={featured}
-                    onOpen={open}
-                  />
-                </>
-              )}
-
-              {/* All listings header + sort */}
-              <View className="gap-3">
-                <SectionHeader
-                  title={`${onlySaved ? "Saved" : "All"} Listings`}
-                  icon={onlySaved ? "heart" : "grid"}
-                  tint={onlySaved ? "bg-red-soft" : "bg-primary-soft"}
-                  color={onlySaved ? colors.red : colors.primary}
-                  count={list.length}
-                />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerClassName="gap-2 pr-4 items-center"
-                  className="-mx-4 px-4 grow-0"
-                >
-                  <Ionicons
-                    name="swap-vertical"
-                    size={16}
-                    color={colors.muted}
-                  />
-                  {SORT_OPTIONS.map((s) => (
-                    <Pressable
-                      key={s}
-                      onPress={() => setSort(s)}
-                      className={cn(
-                        "px-3.5 py-1.5 rounded-full border",
-                        sort === s
-                          ? "bg-ink border-ink"
-                          : "bg-white border-line",
-                      )}
-                    >
-                      <Text
-                        className={cn(
-                          "text-xs font-bold",
-                          sort === s ? "text-white" : "text-muted",
-                        )}
-                      >
-                        {s}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
             </View>
           </View>
         }
@@ -627,7 +485,7 @@ export default function ResellScreen({ navigation }: any) {
             {list.length > 0 && <LoadMoreFooter hasMore={hasMore} total={list.length} noun="listings" />}
             {/* recently viewed sits after the last listing, so only show it once everything is loaded */}
             {!hasMore && !browsing && recents.length ? (
-              <View className="mt-2 px-4">
+              <View className="mt-2">
                 <Rail
                   title="Recently Viewed"
                   icon="time"
@@ -647,12 +505,12 @@ export default function ResellScreen({ navigation }: any) {
 
       <Pressable
         onPress={() => navigation.navigate("CreateListing")}
-        className="absolute right-4 bottom-6 flex-row items-center gap-2 bg-ink rounded-full pl-3 pr-5 py-3 shadow-xl shadow-black/30 active:opacity-90"
+        accessibilityRole="button"
+        accessibilityLabel="Sell an item"
+        className="absolute bottom-5 right-4 flex-row items-center gap-2 bg-primary rounded-full pl-4 pr-5 py-3.5 shadow-lg shadow-orange-900/30 active:opacity-90"
       >
-        <View className="w-8 h-8 rounded-full bg-primary items-center justify-center">
-          <Ionicons name="add" size={20} color="#fff" />
-        </View>
-        <Text className="text-white font-extrabold">Sell</Text>
+        <Ionicons name="add-circle" size={22} color="#fff" />
+        <Text className="text-white font-extrabold text-[15px]">Sell</Text>
       </Pressable>
       <FilterSheet
         visible={filterOpen}

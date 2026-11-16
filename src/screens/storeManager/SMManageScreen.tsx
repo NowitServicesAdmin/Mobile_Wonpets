@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Gradient, cn } from '../../components/ui';
 import { Skeleton, SkeletonScreen } from '../../components/Skeletons';
-import { TONES, DTone } from '../../components/doctor/DoctorUI';
+import { PageHeader, TONES, DTone } from '../../components/doctor/DoctorUI';
 import { useRemote } from '../../hooks/useRemote';
 import { Overview, smService } from '../../services/storeManager.service';
 import { useStoreManager } from '../../context/StoreManagerContext';
@@ -31,10 +31,7 @@ export default function SMManageScreen({ navigation }: any) {
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 gap-4 pb-10"
       refreshControl={<RefreshControl refreshing={ov.refreshing} onRefresh={ov.reload} tintColor={colors.primary} />}>
-      <View>
-        <Text className="text-[22px] font-black text-ink">Management</Text>
-        <Text className="text-[13px] text-muted">Handle all your store data and operations in one place.</Text>
-      </View>
+      <PageHeader icon="settings" title="Management" subtitle="Handle all your store data and operations in one place." />
 
       {/* earnings banner */}
       <Pressable onPress={() => navigation.navigate('SMEarnings')} accessibilityRole="button" className="active:opacity-90">
@@ -59,15 +56,15 @@ export default function SMManageScreen({ navigation }: any) {
             const value = c.key ? ov.data?.[c.key] ?? '—' : '';
             return (
               <Pressable key={c.title} onPress={() => navigation.navigate(c.go)} accessibilityRole="button" accessibilityLabel={c.title}
-                className="w-[48.4%] bg-white rounded-3xl border border-orange-100 p-3.5 active:bg-orange-50">
+                className="w-[48.4%] bg-white rounded-3xl border border-line p-3.5 active:bg-primary-soft">
                 <View className="flex-row items-center justify-between">
-                  <View className={cn('w-11 h-11 rounded-2xl items-center justify-center', t.soft)}><Ionicons name={c.icon} size={21} color={t.fg} /></View>
+                  <View className={cn('w-11 h-11 rounded-full items-center justify-center', t.soft)}><Ionicons name={c.icon} size={21} color={t.fg} /></View>
                   <Ionicons name="arrow-forward" size={16} color="#CDBFB0" />
                 </View>
-                <Text className="text-[15px] font-extrabold text-slate-800 mt-2.5" numberOfLines={1}>{c.title}</Text>
-                <Text className="text-[11px] text-slate-500 leading-[14px]" numberOfLines={2}>{c.desc}</Text>
+                <Text className="text-[15px] font-extrabold text-ink mt-2.5" numberOfLines={1}>{c.title}</Text>
+                <Text className="text-[11px] text-muted leading-[14px]" numberOfLines={2}>{c.desc}</Text>
                 <View className="flex-row items-end gap-1.5 mt-2.5">
-                  {value !== '' && <Text className="text-[22px] font-black text-slate-800 leading-6">{value}</Text>}
+                  {value !== '' && <Text className="text-[22px] font-black text-ink leading-6">{value}</Text>}
                   <Text className={cn('text-[11px] font-semibold mb-0.5', t.text)}>{c.sub}</Text>
                 </View>
               </Pressable>

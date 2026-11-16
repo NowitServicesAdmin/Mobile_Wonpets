@@ -7,7 +7,7 @@ import { OrdersSkeleton } from '../../components/Skeletons';
 import SearchBar from '../../components/common/SearchBar';
 import FilterChips from '../../components/common/FilterChips';
 import LoadMoreFooter from '../../components/LoadMoreFooter';
-import { TONES, DTone } from '../../components/doctor/DoctorUI';
+import { PageHeader, WebStatGrid, DTone } from '../../components/doctor/DoctorUI';
 import { LoadError, ORDER_COLOR, OrderBadge, inr0, inrShort, palette } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { useInfiniteSlice } from '../../hooks/useInfiniteSlice';
@@ -57,16 +57,8 @@ export default function SMOrdersScreen({ navigation, route }: any) {
 
   const header = (
     <View className="gap-3.5 mb-1">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2.5 pr-2">
-        {tiles.map((t) => (
-          <Pressable key={t.label} disabled={!t.status} onPress={() => t.status && setFilter([t.status])} accessibilityRole="button"
-            className="w-[108px] bg-white rounded-2xl border border-orange-100 p-3 active:bg-orange-50">
-            <View className={cn('w-9 h-9 rounded-xl items-center justify-center mb-1.5', TONES[t.tone].soft)}><Ionicons name={t.icon} size={17} color={TONES[t.tone].fg} /></View>
-            <Text className="text-[20px] font-black text-slate-800" numberOfLines={1} adjustsFontSizeToFit>{t.value}</Text>
-            <Text className="text-[11px] text-slate-500">{t.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <PageHeader icon="clipboard" title="Orders" subtitle="Process, ship and track every customer order." />
+      <WebStatGrid stats={tiles.map((t) => ({ title: t.label, value: t.value, icon: t.icon, tone: t.tone, onPress: t.status ? () => setFilter([t.status!]) : undefined }))} />
       <SearchBar value={q} onChangeText={setQ} placeholder="Search by order ID, customer or phone" />
       <FilterChips
         allLabel="All Orders" allCount={orders.length} active={filter} onChange={setFilter}
@@ -93,27 +85,27 @@ function OrderCard({ o, onOpen, act }: { o: SMOrder; onOpen: () => void; act: Re
   const actions = actionsFor(o);
   const withCourier = o.status === 'Shipped' && courierHandles(o);
   return (
-    <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Order ${o.orderId}`} className="bg-white rounded-3xl border border-orange-100 p-3.5 active:bg-orange-50/40">
+    <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Order ${o.orderId}`} className="bg-white rounded-3xl border border-line p-3.5 active:bg-primary-soft">
       <View className="flex-row items-center gap-2">
-        <Text className="flex-1 font-extrabold text-slate-800" numberOfLines={1}>{o.orderId}</Text>
+        <Text className="flex-1 font-extrabold text-ink" numberOfLines={1}>{o.orderId}</Text>
         <OrderBadge status={o.status} />
       </View>
       <View className="flex-row items-center gap-3 mt-2.5">
-        <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center"><Text className="text-orange-500 font-bold">{o.customer.name.charAt(0).toUpperCase()}</Text></View>
+        <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center"><Text className="text-primary font-bold">{o.customer.name.charAt(0).toUpperCase()}</Text></View>
         <View className="flex-1">
-          <Text className="font-semibold text-slate-800" numberOfLines={1}>{o.customer.name}</Text>
-          <Text className="text-xs text-slate-500" numberOfLines={1}>{[o.customer.phone, `${o.items.length} item${o.items.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</Text>
+          <Text className="font-semibold text-ink" numberOfLines={1}>{o.customer.name}</Text>
+          <Text className="text-xs text-muted" numberOfLines={1}>{[o.customer.phone, `${o.items.length} item${o.items.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</Text>
         </View>
         <View className="items-end">
           <Text className="font-extrabold text-green-600">{inr0(o.total)}</Text>
-          <Text className="text-[11px] text-slate-400">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+          <Text className="text-[11px] text-muted">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
         </View>
       </View>
       {(actions.length > 0 || withCourier) && (
-        <View className="flex-row gap-2 mt-3 pt-3 border-t border-slate-100">
+        <View className="flex-row gap-2 mt-3 pt-3 border-t border-line">
           {withCourier && (
-            <View className="flex-1 flex-row items-center justify-center gap-1.5 h-10 rounded-xl bg-slate-100">
-              <Ionicons name="car-outline" size={15} color="#475569" /><Text className="text-slate-600 font-semibold text-[13px]">With courier</Text>
+            <View className="flex-1 flex-row items-center justify-center gap-1.5 h-10 rounded-xl bg-line">
+              <Ionicons name="car-outline" size={15} color="#475569" /><Text className="text-muted font-semibold text-[13px]">With courier</Text>
             </View>
           )}
           {actions.map((a) => {

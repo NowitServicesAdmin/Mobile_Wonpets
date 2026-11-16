@@ -9,7 +9,7 @@ import SearchBar from '../../components/common/SearchBar';
 import BottomSheet from '../../components/common/BottomSheet';
 import InfoGrid from '../../components/common/InfoField';
 import LoadMoreFooter from '../../components/LoadMoreFooter';
-import { WebStatGrid } from '../../components/doctor/DoctorUI';
+import { PageHeader, WebStatGrid } from '../../components/doctor/DoctorUI';
 import { Badge, LoadError, fmtDate, inr0 } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { useInfiniteSlice } from '../../hooks/useInfiniteSlice';
@@ -47,6 +47,7 @@ export default function SMCustomersScreen() {
         onEndReached={page.loadMore} onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <View className="gap-3.5 mb-1">
+            <PageHeader icon="people" title="Customers" subtitle="Everyone who has ordered from your store." />
             <WebStatGrid stats={[
               { title: 'Total Customers', value: s.total, icon: 'people', tone: 'red' },
               { title: 'Active', value: s.active, icon: 'person', tone: 'green' },
@@ -67,12 +68,12 @@ export default function SMCustomersScreen() {
         ListEmptyComponent={<Empty emoji="🧑‍🤝‍🧑" title={all.length ? 'No matching customers' : 'No customers yet'} body={all.length ? 'Try another name or email.' : 'People who order from your store appear here.'} />}
         ListFooterComponent={list.length ? <LoadMoreFooter hasMore={page.hasMore} total={page.total} noun="customers" /> : undefined}
         renderItem={({ item: c }) => (
-          <Pressable onPress={() => setView(c)} accessibilityRole="button" accessibilityLabel={c.name} className="flex-row items-center gap-3 bg-white rounded-2xl border border-orange-100 p-3 active:bg-orange-50/40">
+          <Pressable onPress={() => setView(c)} accessibilityRole="button" accessibilityLabel={c.name} className="flex-row items-center gap-3 bg-white rounded-2xl border border-line p-3 active:bg-primary-soft">
             <Avatar image={c.image} emoji="🧑" size={46} />
             <View className="flex-1">
-              <Text className="font-bold text-slate-800" numberOfLines={1}>{c.name}</Text>
-              <Text className="text-xs text-slate-500" numberOfLines={1}>{c.email || '—'}</Text>
-              <Text className="text-[11px] text-slate-400 mt-0.5">{c.orders} order{c.orders === 1 ? '' : 's'}{c.orders > 1 ? ' · returning' : ''}</Text>
+              <Text className="font-bold text-ink" numberOfLines={1}>{c.name}</Text>
+              <Text className="text-xs text-muted" numberOfLines={1}>{c.email || '—'}</Text>
+              <Text className="text-[11px] text-muted mt-0.5">{c.orders} order{c.orders === 1 ? '' : 's'}{c.orders > 1 ? ' · returning' : ''}</Text>
             </View>
             <View className="items-end gap-1">
               <Text className="font-extrabold text-green-600">{inr0(c.totalSpent)}</Text>

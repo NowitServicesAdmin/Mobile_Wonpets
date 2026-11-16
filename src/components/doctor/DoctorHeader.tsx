@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import TopBar from '../common/TopBar';
+import { Anchor, measureAnchor, useAnchorRef } from '../common/Popover';
 import { useAccountSwitch } from '../common/useAccountSwitch';
-import { StatusDot } from './StatusSheet';
+import StatusSheet, { StatusDot } from './StatusSheet';
 import { STATUS_OPTIONS, useDoctor } from '../../context/DoctorContext';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 
-/** Doctor top bar (the shared TopBar): avatar -> profile (or the account switch when pets are shared), greeting + live status, messages and notifications. */
-export default function DoctorHeader({ onStatusPress }: { onStatusPress: () => void }) {
+/** Doctor top bar (the shared TopBar): avatar -> profile (or the account switch when pets are shared), greeting + live status, messages and notifications.
+ *  The status button opens a small dropdown right under it. */
+export default function DoctorHeader() {
   const nav = useNavigation<any>();
   const { user } = useAuth();
   const { status, unread, profile } = useDoctor();
@@ -18,6 +20,11 @@ export default function DoctorHeader({ onStatusPress }: { onStatusPress: () => v
   const label = STATUS_OPTIONS.find((o) => o.value === status)?.label ?? 'Available';
   const last = (user?.name ?? 'Doctor').replace(/^dr\.?\s+/i, '').trim().split(' ')[0];
 
+  const statusRef = useAnchorRef();
+  const [statusAnchor, setStatusAnchor] = useState<Anchor | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const openStatus = () => measureAnchor(statusRef, (a) => { setStatusAnchor(a); setStatusOpen(true); });
+
   return (
     <>
     <TopBar
@@ -25,7 +32,7 @@ export default function DoctorHeader({ onStatusPress }: { onStatusPress: () => v
       {...avatarProps}
       title={`Hello, Dr. ${last} 👋`}
       subtitle={
-        <Pressable onPress={onStatusPress} accessibilityRole="button" accessibilityLabel={`Status ${label}. Change`} className="flex-row items-center gap-1.5 mt-0.5 self-start">
+        <Pressable ref={statusRef} collapsable={false} onPress={openStatus} accessibilityRole="button" accessibilityLabel={`Status ${label}. Change`} className="flex-row items-center gap-1.5 mt-0.5 self-start">
           <StatusDot size={9} /><Text className="text-xs text-muted font-semibold">{label}</Text><Text className="text-xs text-primary font-bold">· Change</Text>
         </Pressable>
       }
@@ -36,6 +43,7 @@ export default function DoctorHeader({ onStatusPress }: { onStatusPress: () => v
       ]}
     />
     {sheet}
+    <StatusSheet visible={statusOpen} anchor={statusAnchor} onClose={() => setStatusOpen(false)} />
     </>
   );
 }

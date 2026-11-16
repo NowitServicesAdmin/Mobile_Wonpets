@@ -87,7 +87,7 @@ export function Legend({ data, format = (n: number) => String(n) }: { data: { la
       {data.map((d) => (
         <View key={d.label} className="flex-row items-center gap-2">
           <View style={{ backgroundColor: d.color }} className="w-3 h-3 rounded-full" />
-          <Text className="flex-1 text-[13px] text-slate-600" numberOfLines={1}>{d.label}</Text>
+          <Text className="flex-1 text-[13px] text-muted" numberOfLines={1}>{d.label}</Text>
           {total > 0 && <Text className="text-[11px] text-muted">{Math.round((d.value / total) * 100)}%</Text>}
           <Text className="text-[13px] font-bold text-ink min-w-[44px] text-right">{format(d.value)}</Text>
         </View>
@@ -175,7 +175,7 @@ export function Sparkline({ values, color, width = 70, height = 26 }: { values: 
 /** Horizontal progress bar. */
 export function Bar({ ratio, color = '#FB923C', className }: { ratio: number; color?: string; className?: string }) {
   return (
-    <View className={cn('h-1.5 bg-slate-100 rounded-full overflow-hidden', className)}>
+    <View className={cn('h-1.5 bg-line rounded-full overflow-hidden', className)}>
       <View style={{ width: `${Math.max(0, Math.min(1, ratio)) * 100}%`, backgroundColor: color }} className="h-full rounded-full" />
     </View>
   );

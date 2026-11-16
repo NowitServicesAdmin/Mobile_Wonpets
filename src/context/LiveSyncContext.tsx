@@ -65,6 +65,7 @@ export function LiveSyncProvider({ children }: { children: React.ReactNode }) {
   const lastUnread = useRef(0);
   const lastFull = useRef(0);
   const busy = useRef(false);
+  const queued = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshData = useCallback(async () => {
     lastFull.current = Date.now();
@@ -106,13 +107,18 @@ export function LiveSyncProvider({ children }: { children: React.ReactNode }) {
     syncRef.current();
 
     const socket: Socket = io(API_ORIGIN, { auth: { token: tokenStore.get() }, transports: ['websocket'], reconnection: true, reconnectionDelay: 1500 });
-    EVENTS.forEach((e) => socket.on(e, () => syncAllRef.current()));
+    // a burst of server events becomes ONE full refresh, not one per event
+    const queueSync = () => {
+      if (queued.current) return;
+      queued.current = setTimeout(() => { queued.current = null; syncAllRef.current(); }, 1500);
+    };
+    EVENTS.forEach((e) => socket.on(e, queueSync));
     socket.on('connect', () => syncRef.current());
 
     const timer = setInterval(() => { if (AppState.currentState === 'active') syncRef.current(); }, POLL_MS);
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active') syncAllRef.current(); });
 
-    return () => { socket.removeAllListeners(); socket.disconnect(); clearInterval(timer); sub.remove(); };
+    return () => { socket.removeAllListeners(); socket.disconnect(); clearInterval(timer); sub.remove(); if (queued.current) { clearTimeout(queued.current); queued.current = null; } };
   }, [user?.id]);
 
   const value = useMemo(() => ({ unread, tick, syncNow: syncAll }), [unread, tick, syncAll]);
