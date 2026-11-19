@@ -73,14 +73,14 @@ const NO_CARD: Key[] = ['profile', 'notifications'];
 export default function SettingsScreen({ route }: any) {
   const insets = useSafeAreaInsets();
   const { signOut, user } = useAuth();
-  const { invitations, subscription, plans, info, ready } = useSettings();
+  const { invitations, subscription, expiredPlan, plans, info, ready } = useSettings();
   const nav = useNavigation<any>();
   const focused = useIsFocused();
   const [open, setOpen] = useState<Key | null>(toKey(route.params?.open));
   const scroll = useRef<ScrollViewInstance>(null);
   const place = headerLocation(info, user?.location); // same source as the app header
   const pendingInvites = invitations.filter((i) => i.status === 'pending').length;
-  const planName = subscription ? plans.find((p) => p.id === subscription.planId)?.name ?? 'Plan' : 'Free';
+  const planName = subscription ? plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId : expiredPlan ? 'Ended' : 'Free';
 
   // the screen is a tab, so it stays mounted - react when another screen asks for a section
   useEffect(() => {

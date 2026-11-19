@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { cn } from '../ui';
@@ -7,11 +7,13 @@ import { cn } from '../ui';
 /**
  * Search box with a clear button. `trailing` adds a square icon button next to it (e.g. a sort toggle or a filter button).
  * `trailing.badge` shows a small count on that button (e.g. the number of active filters) and tints it.
+ * `onCamera` adds a "search by photo" camera icon inside the box (`scanning` swaps it for a spinner).
  */
 export default function SearchBar({
-  value, onChangeText, placeholder = 'Search…', trailing, className,
+  value, onChangeText, placeholder = 'Search…', trailing, className, onCamera, scanning,
 }: {
   value: string; onChangeText: (t: string) => void; placeholder?: string;
+  onCamera?: () => void; scanning?: boolean;
   trailing?: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; badge?: number };
   className?: string;
 }) {
@@ -22,6 +24,9 @@ export default function SearchBar({
         <Ionicons name="search-outline" size={18} color={colors.muted} />
         <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#B8AEA5" className="flex-1 py-3 text-ink" autoCorrect={false} />
         {!!value && <Pressable onPress={() => onChangeText('')} hitSlop={8} accessibilityLabel="Clear search"><Ionicons name="close-circle" size={18} color="#CDBFB0" /></Pressable>}
+        {!!onCamera && (scanning
+          ? <ActivityIndicator size="small" color={colors.primary} />
+          : <Pressable onPress={onCamera} hitSlop={8} accessibilityLabel="Search by photo"><Ionicons name="camera-outline" size={20} color={colors.primary} /></Pressable>)}
       </View>
       {!!trailing && (
         <Pressable onPress={trailing.onPress} accessibilityRole="button" accessibilityLabel={trailing.label} className={cn('w-12 rounded-2xl border items-center justify-center active:bg-primary-soft', on ? 'bg-primary-soft border-primary' : 'bg-white border-line')}>

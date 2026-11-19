@@ -1,9 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Listing } from '../data/resell';
 import { toast } from '../components/WonPetsAlert';
 import { useAuth } from './AuthContext';
 import { errorMessage } from '../services/api';
-import { ListingInput, resellService } from '../services/resell.service';
+import { ListingInput, Viewer, resellService } from '../services/resell.service';
+import { useLiveLocation } from './LocationContext';
 
 type Ctx = {
   /** Marketplace listings from other sellers + your own (yours have sellerId === 'me'). */
@@ -35,7 +37,12 @@ const merge = (list: Listing[], items: Listing[]) => {
 
 export function ResellProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { place } = useLiveLocation();
   const meId = user?.id ?? '';
+  // the buyer's position (rounded to ~1 km so small GPS jitter doesn't refetch) - listings then come back with distanceKm
+  const viewerKey = place ? `${place.lat.toFixed(2)},${place.lng.toFixed(2)}` : '';
+  const viewerRef = useRef<Viewer>(null);
+  viewerRef.current = place ? { lat: place.lat, lng: place.lng } : null;
   const [listings, setListings] = useState<Listing[]>([]);
   const [favourites, setFavourites] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
@@ -48,7 +55,7 @@ export function ResellProvider({ children }: { children: React.ReactNode }) {
     if (!meId) return;
     if (!quiet) setLoading(true);
     try {
-      const [all, mine, favs] = await Promise.all([resellService.all(meId), resellService.mine(meId), resellService.favourites(meId)]);
+      const [all, mine, favs] = await Promise.all([resellService.all(meId, viewerRef.current), resellService.mine(meId), resellService.favourites(meId)]);
       setListings(merge(all, mine));
       setFavourites(favs.map((f) => f.id));
     } catch (e) {
@@ -67,6 +74,27 @@ export function ResellProvider({ children }: { children: React.ReactNode }) {
     loadedFor.current = user.id;
     refresh();
   }, [user, refresh]);
+
+  // the phone's location arrived / changed after the first load -> refetch so distances and "nearest first" are right
+  useEffect(() => {
+    if (viewerKey && meId && loadedFor.current === meId) load(true);
+  }, [viewerKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Recently viewed" survives app restarts (the web keeps it in localStorage)
+  const recentReady = useRef(false);
+  useEffect(() => {
+    recentReady.current = false;
+    if (!meId) return;
+    let live = true;
+    AsyncStorage.getItem(`wonpet:resell-recent:${meId}`)
+      .then((raw) => { if (live && raw) { try { setRecent(JSON.parse(raw)); } catch { /* ignore */ } } })
+      .catch(() => {})
+      .finally(() => { recentReady.current = live; });
+    return () => { live = false; };
+  }, [meId]);
+  useEffect(() => {
+    if (meId && recentReady.current) AsyncStorage.setItem(`wonpet:resell-recent:${meId}`, JSON.stringify(recent)).catch(() => {});
+  }, [recent, meId]);
 
   const loadListing: Ctx['loadListing'] = async (id) => {
     try {

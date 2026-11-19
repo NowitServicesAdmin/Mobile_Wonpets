@@ -21,7 +21,7 @@ export default function PatientDetailScreen({ route, navigation }: any) {
   const petId: string = route.params.petId;
   const { tick } = useDoctor();
   const { startConversation } = useChat();
-  const [tab, setTab] = useState<Tab>('visits');
+  const [tab, setTab] = useState<Tab>(['visits', 'history', 'vaccines'].includes(route.params?.tab) ? route.params.tab : 'visits');
   const info = useRemote(() => doctorService.patient(petId), [petId], tick);
   const visits = useRemote(() => doctorService.patientVisits(petId), [petId], tick);
   const history = useRemote(() => doctorService.patientHistory(petId), [petId], tick);

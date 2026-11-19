@@ -13,12 +13,32 @@ export type MedicalRecordItem = {
 export type DoctorStatus = 'available' | 'busy' | 'away' | 'on_leave';
 export type DashboardData = {
   stats: { total: number; today: number; pending: number; confirmed: number; inProgress: number; completed: number; cancelled: number; patients: number; completionRate: number };
-  overview: { visits: number; revenue: number; newPatients: number; treatments: number };
+  overview: { visits: number; revenue: number; newPatients: number; treatments: number; workingHours: number };
+  /** "This Month's Stats" card on the web dashboard. */
+  monthStats: { visits: number; consultations: number; earnings: number };
+  collaborations: DoctorCollab[];
   schedule: Appointment[]; recentPatients: DoctorPatient[]; followUps: FollowUp[];
 };
+/** A live (pending / active / upcoming) collaboration invite from a pet owner. */
+export type DoctorCollab = { id: string; status: string; owner: string; ownerImage?: string; pets: string[]; endDate?: string };
+export type EarningsRange = 'week' | 'month' | '3months' | 'year' | 'custom';
+export type EarningsParams = { range: EarningsRange; startDate?: string; endDate?: string };
+export type EarningsPoint = { label: string; fullLabel: string; earnings: number; appointments: number };
 export type EarningsData = {
-  stats: { total: number; today: number; month: number; average: number; completed: number; appointments: number };
-  daily: { label: string; value: number }[]; monthly: { label: string; value: number }[]; breakdown: { name: string; value: number; pct: string }[];
+  range: { key: string; label: string };
+  stats: {
+    total: number; totalGrowth: number; completed: number; completedGrowth: number; average: number; averageGrowth: number;
+    pendingPayout: number; pendingPayoutCount: number;
+  };
+  trend: EarningsPoint[];
+  breakdown: { type: string; name: string; value: number; count: number; percentage: number }[];
+  sources: { key: string; title: string; value: number; percentage: number }[];
+  bestDay: EarningsPoint | null;
+};
+export type EarningsReport = {
+  range: { key: string; label: string; startDate: string; endDate: string };
+  summary: { total: number; completed: number; average: number };
+  rows: { appointmentId: string; date: string; time: string; owner: string; pet: string; visitType: string; mode: string; fee: number; payment: string; paymentStatus: string }[];
 };
 export type DoctorProfile = {
   id: string; name: string; email: string; phone: string; image?: string; status: DoctorStatus;
@@ -42,7 +62,12 @@ export const doctorService = {
         total: n(s.totalAppointments), today: n(s.todayAppointments), pending: n(s.pendingAppointments), confirmed: n(s.confirmedAppointments),
         inProgress: n(s.inProgressAppointments), completed: n(s.completedAppointments), cancelled: n(s.cancelledAppointments), patients: n(s.totalPatients), completionRate: n(s.completionRate),
       },
-      overview: { visits: n(o.visits), revenue: n(o.revenue), newPatients: n(o.newPatients), treatments: n(o.treatments) },
+      overview: { visits: n(o.visits), revenue: n(o.revenue), newPatients: n(o.newPatients), treatments: n(o.treatments), workingHours: n(o.workingHours) || 8 },
+      monthStats: { visits: n(data.monthStats?.visits), consultations: n(data.monthStats?.consultations), earnings: n(data.monthStats?.earnings) },
+      collaborations: list(data.collaborations, (c: any): DoctorCollab => ({
+        id: String(c._id), status: String(c.status || 'Pending'), owner: c.owner?.name || 'Pet owner', ownerImage: absUrl(c.owner?.profileImage),
+        pets: (c.pets || []).map((x: any) => x?.name).filter(Boolean), endDate: c.endDate ? String(c.endDate).slice(0, 10) : undefined,
+      })),
       schedule: list(data.schedule, mapDoctorAppointment),
       recentPatients: list(data.recentPatients, mapPatient),
       followUps: list(data.followUps, mapFollowUp),
@@ -129,14 +154,33 @@ export const doctorService = {
   },
 
   /* ------------------------------- earnings ------------------------------ */
-  async earnings(): Promise<EarningsData> {
-    const { data } = await api.get('/doctor/earnings/dashboard');
+  /** Same endpoint and range options as the web Earnings page (week / month / 3months / year / custom with startDate + endDate). */
+  async earnings(params: EarningsParams = { range: 'month' }): Promise<EarningsData> {
+    const { data } = await api.get('/doctor/earnings/dashboard', { params });
     const s = data.stats || {};
+    const point = (t: any): EarningsPoint => ({ label: String(t.label ?? ''), fullLabel: String(t.fullLabel ?? t.label ?? ''), earnings: n(t.earnings), appointments: n(t.appointments) });
     return {
-      stats: { total: n(s.totalEarnings), today: n(s.todayEarnings), month: n(s.thisMonthEarnings), average: n(s.averageConsultationFee), completed: n(s.completedAppointments), appointments: n(s.totalAppointments) },
-      daily: list(data.earningsOverview, (d) => ({ label: String(d.day), value: n(d.earnings) })),
-      monthly: list(data.monthlyTrend, (d) => ({ label: String(d.month), value: n(d.earnings) })),
-      breakdown: list(data.earningsSummary, (d) => ({ name: String(d.title), value: n(String(d.amount).replace(/[^\d.]/g, '')), pct: String(d.percentage) })),
+      range: { key: String(data.range?.key ?? params.range), label: String(data.range?.label ?? '') },
+      stats: {
+        total: n(s.totalEarnings), totalGrowth: n(s.earningsGrowth), completed: n(s.completedAppointments), completedGrowth: n(s.appointmentsGrowth),
+        average: n(s.averageConsultationFee), averageGrowth: n(s.averageGrowth), pendingPayout: n(s.pendingPayout), pendingPayoutCount: n(s.pendingPayoutCount),
+      },
+      trend: list(data.trend, point),
+      breakdown: list(data.breakdown, (b) => ({ type: String(b.type ?? b.name), name: String(b.name), value: n(b.value), count: n(b.count), percentage: n(b.percentage) })),
+      sources: list(data.sources, (b) => ({ key: String(b.key), title: String(b.title), value: n(b.value), percentage: n(b.percentage) })),
+      bestDay: data.bestDay ? point(data.bestDay) : null,
+    };
+  },
+  /** Detailed rows behind "Export Report" (same range params as the dashboard). */
+  async earningsReport(params: EarningsParams): Promise<EarningsReport> {
+    const { data } = await api.get('/doctor/earnings/export', { params });
+    return {
+      range: { key: String(data.range?.key ?? ''), label: String(data.range?.label ?? ''), startDate: String(data.range?.startDate ?? ''), endDate: String(data.range?.endDate ?? '') },
+      summary: { total: n(data.summary?.totalEarnings), completed: n(data.summary?.completedAppointments), average: n(data.summary?.averageConsultationFee) },
+      rows: list(data.rows, (r) => ({
+        appointmentId: String(r.appointmentId || ''), date: String(r.date || ''), time: String(r.time || ''), owner: String(r.owner || ''), pet: String(r.pet || ''),
+        visitType: String(r.visitType || 'General'), mode: String(r.appointmentType || ''), fee: n(r.fee), payment: String(r.paymentMethod || ''), paymentStatus: String(r.paymentStatus || ''),
+      })),
     };
   },
 

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
-import { Card, SectionHeader, cn } from '../ui';
+import { cn } from '../ui';
+import { Panel, PanelHeader } from '../doctor/DoctorUI';
 
 type Status = 'Pending' | 'Processing' | 'Delivered' | 'Cancelled';
 type Props = { counts: Record<Status, number>; onOpen: (filter?: Status) => void };
@@ -14,33 +14,20 @@ const cards: { k: Status; icon: keyof typeof Ionicons.glyphMap; box: string; ico
   { k: 'Cancelled', icon: 'close-circle-outline', box: 'bg-red-50', iconBox: 'bg-red-100', fg: '#EF4444' },
 ];
 
+/** Order counts in a single row of four tiles (was a 2 x 2 grid). */
 export default function OrdersOverview({ counts, onOpen }: Props) {
   return (
-    <Card className="border-orange-100">
-      <SectionHeader
-        title="My Orders"
-        subtitle="Monitor your recent purchases"
-        icon={<View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center"><Ionicons name="clipboard-outline" size={19} color={colors.primary} /></View>}
-      />
-      {/* 2 x 2 compact tiles: icon on the left, status + count on the right */}
-      <View className="flex-row flex-wrap gap-2.5">
+    <Panel compact className="border-orange-100">
+      <PanelHeader compact icon="clipboard" title="My Orders" caption="Monitor your recent purchases" action="View All" onAction={() => onOpen()} />
+      <View className="flex-row gap-1.5">
         {cards.map((c) => (
-          <Pressable key={c.k} onPress={() => onOpen(c.k)} accessibilityRole="button" accessibilityLabel={`${c.k} orders: ${counts[c.k]}`} className={cn('w-[48.3%] flex-row items-center gap-2.5 rounded-2xl px-3 py-3 active:opacity-80', c.box)}>
-            <View className={cn('w-10 h-10 rounded-full items-center justify-center', c.iconBox)}><Ionicons name={c.icon} size={19} color={c.fg} /></View>
-            <View className="flex-1">
-              <Text maxFontSizeMultiplier={1.1} className="text-xs font-semibold text-muted" numberOfLines={1}>{c.k}</Text>
-              <Text maxFontSizeMultiplier={1.1} className="text-[22px] font-black text-ink leading-7">{String(counts[c.k]).padStart(2, '0')}</Text>
-            </View>
+          <Pressable key={c.k} onPress={() => onOpen(c.k)} accessibilityRole="button" accessibilityLabel={`${c.k} orders: ${counts[c.k]}`} className={cn('flex-1 items-center rounded-2xl py-2 px-1 active:opacity-80', c.box)}>
+            <View className={cn('w-8 h-8 rounded-full items-center justify-center', c.iconBox)}><Ionicons name={c.icon} size={16} color={c.fg} /></View>
+            <Text maxFontSizeMultiplier={1.1} className="text-[17px] font-black text-ink leading-6 mt-0.5">{String(counts[c.k]).padStart(2, '0')}</Text>
+            <Text maxFontSizeMultiplier={1.1} className="text-[10px] font-semibold text-muted" numberOfLines={1}>{c.k}</Text>
           </Pressable>
         ))}
       </View>
-      <Pressable onPress={() => onOpen()} accessibilityRole="button" className="flex-row items-center justify-between mt-3 bg-primary-soft rounded-2xl px-3.5 py-3 active:opacity-80">
-        <View className="flex-row items-center gap-2">
-          <Ionicons name="time-outline" size={17} color={colors.primary} />
-          <Text maxFontSizeMultiplier={1.1} className="text-primary font-bold">View order history</Text>
-        </View>
-        <Ionicons name="arrow-forward" size={17} color={colors.primary} />
-      </Pressable>
-    </Card>
+    </Panel>
   );
 }

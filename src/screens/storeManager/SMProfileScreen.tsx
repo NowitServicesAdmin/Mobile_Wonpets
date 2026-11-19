@@ -15,6 +15,7 @@ import StoreDetailsSection from '../../components/storeManager/StoreDetailsSecti
 import PickupSection, { PICKUP_STATUS } from '../../components/storeManager/PickupSection';
 import { Badge } from '../../components/storeManager/SMUI';
 import DocumentsSection from '../../components/settings/DocumentsSection';
+import SubscriptionSection from '../../components/settings/SubscriptionSection';
 import NotificationsSection from '../../components/settings/NotificationsSection';
 import LanguageSection from '../../components/settings/LanguageSection';
 import FaqSection from '../../components/settings/FaqSection';
@@ -29,13 +30,14 @@ import { useStoreManager } from '../../context/StoreManagerContext';
 import { headerLocation } from '../../utils/location';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Key = 'profile' | 'store' | 'pickup' | 'kyc' | 'documents' | 'prefs' | 'language' | 'faq' | 'support';
+type Key = 'profile' | 'store' | 'pickup' | 'kyc' | 'subscription' | 'documents' | 'prefs' | 'language' | 'faq' | 'support';
 
 const sections: Record<Key, { title: string; icon: IconName }> = {
   profile: { title: 'Profile', icon: 'person-outline' },
   store: { title: 'Store details', icon: 'storefront-outline' },
   pickup: { title: 'Courier pickup', icon: 'cube-outline' },
   kyc: { title: 'KYC & payouts', icon: 'card-outline' },
+  subscription: { title: 'Subscription', icon: 'card-outline' },
   documents: { title: 'Documents', icon: 'document-text-outline' },
   prefs: { title: 'Notification settings', icon: 'notifications-outline' },
   language: { title: 'Language', icon: 'language-outline' },
@@ -45,7 +47,7 @@ const sections: Record<Key, { title: string; icon: IconName }> = {
 const toKey = (k?: string): Key | null => (k && k in sections ? (k as Key) : null);
 // sections that draw their own cards
 const NO_CARD: Key[] = ['profile', 'store', 'pickup', 'kyc', 'prefs'];
-const SERVER_BACKED: Key[] = ['store', 'documents', 'prefs'];
+const SERVER_BACKED: Key[] = ['store', 'subscription', 'documents', 'prefs'];
 
 type Item =
   | { kind: 'page'; key: Key; title: string; hint: string; icon: IconName; tone: MenuTone }
@@ -60,6 +62,7 @@ const STORE: Item[] = [
 ];
 const ACCOUNT: Item[] = [
   page('kyc', 'Bank details to receive payouts', 'green'),
+  page('subscription', 'Plans & billing', 'purple'),
   page('documents', 'Business licence, GST, identity', 'purple'),
 ];
 const PREFS: Item[] = [
@@ -74,7 +77,7 @@ export default function SMProfileScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const { user, signOut } = useAuth();
-  const { info, documents, ready } = useSettings();
+  const { info, documents, ready, subscription, expiredPlan, plans } = useSettings();
   const { language } = useLanguage();
   const { tick } = useStoreManager();
   const [open, setOpen] = useState<Key | null>(toKey(route.params?.open));
@@ -117,6 +120,7 @@ export default function SMProfileScreen({ navigation, route }: any) {
     if (it.key === 'pickup' && pickup) return { badge: PICKUP_STATUS[pickup] };
     if (it.key === 'documents' && ready) return { text: `${docsDone}/${STORE_DOCUMENT_TYPES.length}` };
     if (it.key === 'language') return { text: language.label };
+    if (it.key === 'subscription' && ready) return subscription ? { text: plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId } : expiredPlan ? { chip: { label: 'Ended', tone: 'red' as Tone } } : { text: 'Free' };
     return {};
   };
 
@@ -153,6 +157,7 @@ export default function SMProfileScreen({ navigation, route }: any) {
       store: <StoreDetailsSection />,
       pickup: <PickupSection onOpenStore={() => setOpen('store')} onStatus={setPickup} />,
       kyc: <KycSection onStatus={setKyc} />,
+      subscription: <SubscriptionSection />,
       documents: <DocumentsSection types={STORE_DOCUMENT_TYPES} />,
       prefs: <NotificationsSection only={STORE_NOTIFICATION_KEYS} />,
       language: <LanguageSection />,

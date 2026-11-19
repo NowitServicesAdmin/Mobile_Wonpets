@@ -1,12 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, ScrollView, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Image, LayoutChangeEvent, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme";
 import { Empty, Gradient, SectionHeader, T, cn } from "../../components/ui";
 import SearchBar from "../../components/common/SearchBar";
 import FilterChips from "../../components/common/FilterChips";
-import SegmentedTabs from "../../components/common/SegmentedTabs";
-import StatRow from "../../components/common/StatTile";
 import { ListingCard } from "../../components/resell/ListingBits";
 import FilterSheet, {
   Filters,
@@ -14,15 +12,17 @@ import FilterSheet, {
   noFilters,
 } from "../../components/resell/FilterSheet";
 import { UnreadBadge } from "../../components/chat/ChatBits";
-import { Listing, SORT_OPTIONS, TABS } from "../../data/resell";
+import { Listing, PET_SUBTABS, SAFETY_TIPS, SORT_OPTIONS, TABS, withinDistance } from "../../data/resell";
 import { useResell } from "../../context/ResellContext";
 import { useChat } from "../../context/ChatContext";
-import { useAuth } from "../../context/AuthContext";
 import { ListingGridSkeleton } from "../../components/Skeletons";
 import LoadMoreFooter from "../../components/LoadMoreFooter";
 import { useLiveLocation } from "../../context/LocationContext";
-import { useSettings } from "../../context/SettingsContext";
+import { toast } from "../../components/WonPetsAlert";
 import { areaCity } from "../../utils/location";
+import { searchByPhoto } from "../../utils/imageSearch";
+import PhotoItemChips from "../../components/common/PhotoItemChips";
+import { VisualSearchItem } from "../../services/shared.service";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -34,7 +34,7 @@ const matchesTab = (l: Listing, tab: string) =>
       ? l.listingType === "Product" &&
         !["Accessories", "Beds", "Grooming"].includes(l.category)
       : l.category === tab);
-const TRENDING = ["Most Viewed", "Newest", "Near You"] as const;
+const WEEK = 7 * 86400000; // "Recently Added" = listed in the last 7 days (same as the web)
 const PAGE_SIZE = 10; // listings revealed per scroll batch (even, so the 2-column grid stays full)
 
 /** Round tinted icon used in front of every section title (same as the Dashboard sections). */
@@ -140,61 +140,81 @@ function Rail({
   );
 }
 
-/** Marketplace home: browse pets & pre-owned items from other owners, or sell your own. */
+/** Quick-filter pill (Nearby / Under ₹1,000 / Like New / Recently Added) - same four as the web. */
+function QuickChip({ icon, label, on, onPress }: { icon: IconName; label: string; on: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      className={cn("flex-row items-center gap-1.5 px-3.5 py-2 rounded-full border", on ? "bg-primary-soft border-primary" : "bg-white border-line")}
+    >
+      <Ionicons name={icon} size={14} color={colors.primary} />
+      <Text className={cn("font-bold text-[13px]", on ? "text-primary" : "text-ink")}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** "Meet safely" card from the web's side panel. */
+function SafetyCard() {
+  const [more, setMore] = useState(false);
+  const tips = more ? SAFETY_TIPS : SAFETY_TIPS.slice(0, 3);
+  return (
+    <View className="bg-orange-50 border border-line rounded-3xl p-4 gap-3">
+      <View className="flex-row items-center gap-2">
+        <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
+        <Text className={T.h2}>Meet safely</Text>
+      </View>
+      {tips.map((t) => (
+        <View key={t} className="flex-row items-start gap-2">
+          <Ionicons name="checkmark-circle" size={16} color={colors.green} style={{ marginTop: 2 }} />
+          <Text className="flex-1 text-sm text-ink leading-5">{t}</Text>
+        </View>
+      ))}
+      <Pressable onPress={() => setMore((v) => !v)} hitSlop={8} className="flex-row items-center gap-1 self-start">
+        <Text className="text-primary font-bold text-[13px]">{more ? "Show less" : "Learn more"}</Text>
+        <Ionicons name={more ? "chevron-up" : "chevron-down"} size={14} color={colors.primary} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** Marketplace home - mirrors the web Resell page: hero, quick filters, "Popular near you" grid (nearest first), safety tips, recently viewed. */
 export default function ResellScreen({ navigation }: any) {
   const { listings, favourites, recent, loading, refresh } = useResell();
   const { unreadByKind } = useChat();
-  const { user } = useAuth();
+  const { place: live } = useLiveLocation();
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<string>("All");
+  const [subTab, setSubTab] = useState<string>("All"); // Dogs / Cats / ... under the Pets tab
   const [filters, setFilters] = useState<Filters>(noFilters);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [sort, setSort] =
-    useState<(typeof SORT_OPTIONS)[number]>("Newest First");
-  const [trending, setTrending] =
-    useState<(typeof TRENDING)[number]>("Most Viewed");
+  const [sort, setSort] = useState<(typeof SORT_OPTIONS)[number]>("Recommended");
+  const [recentOnly, setRecentOnly] = useState(false);
   const [onlySaved, setOnlySaved] = useState(false);
+  const [scanning, setScanning] = useState(false); // "search by photo" in progress
+  const [photo, setPhoto] = useState<{ term: string; items: VisualSearchItem[] } | null>(null); // everything spotted in the last photo
   const open = (id: string) => navigation.navigate("ListingDetail", { id });
+
+  const listRef = useRef<FlatList<Listing>>(null);
+  const gridY = useRef(0); // where the listings section starts inside the header ("Explore listings" scrolls here)
+  const hasViewer = !!live;
+  const viewerLabel = areaCity(live);
 
   const available = useMemo(
     () => listings.filter((l) => l.status === "Available" && l.isActive),
     [listings],
   );
-  const stats = [
-    {
-      label: "Pets",
-      icon: "paw" as IconName,
-      color: colors.primary,
-      value: available.filter((l) => l.listingType === "Pet").length,
-    },
-    {
-      label: "Products",
-      icon: "cube" as IconName,
-      color: colors.purple,
-      value: available.filter((l) => l.listingType === "Product").length,
-    },
-    {
-      label: "Sellers",
-      icon: "people" as IconName,
-      color: colors.blue,
-      value: new Set(available.map((l) => l.sellerId)).size,
-    },
-    {
-      label: "New today",
-      icon: "sparkles" as IconName,
-      color: colors.green,
-      value: available.filter(
-        (l) => Date.now() - new Date(l.createdAt).getTime() < 86400000,
-      ).length,
-    },
-  ];
 
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
+    const weekAgo = Date.now() - WEEK;
     const out = available.filter(
       (l) =>
         matchesTab(l, tab) &&
+        (tab !== "Pets" || subTab === "All" || l.category === PET_SUBTABS[subTab]) &&
         (!onlySaved || favourites.includes(l.id)) &&
+        (!recentOnly || new Date(l.createdAt).getTime() >= weekAgo) &&
         (!kw ||
           `${l.title} ${l.breed ?? ""} ${l.category} ${l.brand ?? ""} ${l.description}`
             .toLowerCase()
@@ -207,70 +227,83 @@ export default function ResellScreen({ navigation }: any) {
         (!filters.min || l.price >= Number(filters.min)) &&
         (!filters.max || l.price <= Number(filters.max)) &&
         (filters.category === "All" || l.category === filters.category) &&
-        (filters.type === "All" || l.listingType === filters.type),
+        (filters.type === "All" || l.listingType === filters.type) &&
+        withinDistance(l, filters.distance),
     );
+    const newest = (a: Listing, b: Listing) => b.createdAt.localeCompare(a.createdAt);
     const by: Record<string, (a: Listing, b: Listing) => number> = {
-      "Newest First": (a, b) => b.createdAt.localeCompare(a.createdAt),
+      // nearest first; listings without a location (or when the buyer's location is unknown) fall back to newest
+      Recommended: (a, b) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9) || newest(a, b),
       "Price: Low to High": (a, b) => a.price - b.price,
       "Price: High to Low": (a, b) => b.price - a.price,
       "Most Viewed": (a, b) => b.views - a.views,
     };
     return out.sort(by[sort]);
-  }, [available, q, tab, filters, sort, onlySaved, favourites]);
+  }, [available, q, tab, subTab, filters, sort, onlySaved, recentOnly, favourites]);
 
-  // "Near You": rank listings by how closely their location text matches where the user is (area > city > district)
-  const { place: live } = useLiveLocation();
-  const { info } = useSettings();
-  const nearTokens = useMemo(() => {
-    const t = (v?: string) => (v || "").trim().toLowerCase();
-    const saved =
-      t(info?.city) || t((user?.location ?? "").split(",").slice(-3, -2)[0]);
-    return {
-      area: t(live?.area),
-      city: t(live?.city) || saved,
-      district: t(live?.district) || t(info?.district),
-    };
-  }, [live, info, user?.location]);
-  const nearLabel = areaCity(live) || [info?.city].filter(Boolean).join("");
-  const nearScore = (l: Listing) => {
-    const loc = l.location.toLowerCase();
-    const { area, city, district } = nearTokens;
-    return (
-      (area && loc.includes(area) ? 3 : 0) +
-      (city && loc.includes(city) ? 2 : 0) +
-      (district && loc.includes(district) ? 1 : 0)
-    );
-  };
-  const trendingList = useMemo(() => {
-    const base =
-      trending === "Newest"
-        ? [...available].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        : trending === "Near You"
-          ? available
-              .map((l) => ({ l, s: nearScore(l) }))
-              .filter((x) => x.s > 0)
-              .sort((a, b) => b.s - a.s || b.l.views - a.l.views)
-              .map((x) => x.l)
-          : [...available].sort((a, b) => b.views - a.views);
-    return base.slice(0, 8);
-  }, [available, trending, nearTokens]);
   const featured = available.filter((l) => l.isFeatured);
   const recents = recent
     .map((id) => listings.find((l) => l.id === id))
     .filter(Boolean) as Listing[];
   const nFilters = activeFilterCount(filters);
-  const browsing = !!q || tab !== "All" || nFilters > 0 || onlySaved;
+  const browsing = !!q || tab !== "All" || nFilters > 0 || onlySaved || recentOnly;
   const resetAll = () => {
     setQ("");
     setTab("All");
+    setSubTab("All");
     setFilters(noFilters);
     setOnlySaved(false);
+    setRecentOnly(false);
+    setSort("Recommended");
+    setPhoto(null);
   };
 
-  // category chips with live counts ("Pets · 12"); single-select on top of the shared multi-select FilterChips
+  // quick filters write into the same Filters object as the sheet, so the two always agree
+  const toggleNearby = () => {
+    if (!hasViewer) {
+      toast.error("We couldn't detect your location yet.");
+      return;
+    }
+    setFilters((f) => ({ ...f, distance: f.distance === "10" ? "any" : "10" })); // "Nearby" = within 10 km
+  };
+  const toggleUnder = () => setFilters((f) => ({ ...f, max: f.max === "1000" ? "" : "1000" }));
+  const toggleLikeNew = () => setFilters((f) => ({ ...f, condition: f.condition === "Like New" ? "All" : "Like New" }));
+
+  const pickTab = (next: string) => {
+    setTab(next);
+    setSubTab("All");
+  };
+
+  // camera icon: take / pick a photo, the backend returns a term that really exists in the listings
+  const photoSearch = async () => {
+    if (scanning) return;
+    setScanning(true);
+    const r = await searchByPhoto("resell");
+    setScanning(false);
+    if (!r) return;
+    // clear anything that would hide the match; a pet photo only looks at pets, a product photo at products
+    pickTab("All");
+    setOnlySaved(false);
+    setRecentOnly(false);
+    setFilters({ ...noFilters, type: r.listingType === "Pets" ? "Pet" : "Product" });
+    setQ(r.searchTerm);
+    setPhoto({ term: r.searchTerm, items: r.items ?? [] });
+  };
+
+  // tap another item that was in the photo
+  const pickPhotoItem = (it: VisualSearchItem) => {
+    pickTab("All");
+    setOnlySaved(false);
+    setRecentOnly(false);
+    setFilters({ ...noFilters, type: it.listingType === "Pets" ? "Pet" : "Product" });
+    setQ(it.searchTerm);
+    setPhoto((p) => (p ? { ...p, term: it.searchTerm } : p));
+  };
+
+  // category chips with live counts ("Pets · 12"). "More" is left out, like the web's category bar.
   const tabOptions = useMemo(
     () =>
-      TABS.filter((t) => t !== "All").map((t) => ({
+      TABS.filter((t) => t !== "All" && t !== "More").map((t) => ({
         key: t as string,
         label: t as string,
         count: available.filter((l) => matchesTab(l, t)).length,
@@ -282,12 +315,17 @@ export default function ResellScreen({ navigation }: any) {
   const [shown, setShown] = useState(PAGE_SIZE);
   const pageItems = useMemo(() => list.slice(0, shown), [list, shown]);
   const hasMore = shown < list.length;
-  useEffect(() => { setShown(PAGE_SIZE); }, [q, tab, filters, sort, onlySaved]); // new search / filter / sort starts from the top
+  useEffect(() => { setShown(PAGE_SIZE); }, [q, tab, subTab, filters, sort, onlySaved, recentOnly]); // new search / filter / sort starts from the top
   const loadMore = useCallback(() => { if (hasMore) setShown((n) => Math.min(n + PAGE_SIZE, list.length)); }, [hasMore, list.length]);
+
+  const explore = () => listRef.current?.scrollToOffset({ offset: gridY.current + 16, animated: true });
+  const onGridLayout = (e: LayoutChangeEvent) => { gridY.current = e.nativeEvent.layout.y; };
+  const farFilter = filters.distance !== "any";
 
   return (
     <View className="flex-1 bg-cream">
       <FlatList
+        ref={listRef}
         className="flex-1"
         data={pageItems}
         keyExtractor={(l) => l.id}
@@ -302,46 +340,75 @@ export default function ResellScreen({ navigation }: any) {
           loading && !listings.length ? (
             <ListingGridSkeleton count={6} />
           ) : (
-            <Empty
-              emoji="🔍"
-              title="No listings match"
-              body="Try a different search, category or filters."
-            />
+            <View className="items-center">
+              <Empty
+                emoji="🔍"
+                title={farFilter ? "No listings in this distance range" : "No listings match"}
+                body={farFilter ? "Try a bigger distance, or look at listings from anywhere." : "Try widening your search, or clear your filters."}
+              />
+              <Pressable
+                onPress={farFilter ? () => setFilters((f) => ({ ...f, distance: "any" })) : resetAll}
+                className="bg-primary rounded-full px-5 py-2.5 active:opacity-90"
+              >
+                <Text className="text-white font-bold text-[14px]">{farFilter ? "Any distance" : "Clear filters"}</Text>
+              </Pressable>
+            </View>
           )
         }
         ListHeaderComponent={
           <View className="gap-4 mb-3">
-            {/* hero card */}
+            {/* hero card - soft cream/peach like the web hero, dark text with an orange accent */}
             <Gradient
-              className="rounded-3xl p-4 overflow-hidden"
-              colorsArr={["#FF6B00", "#F59E0B"]}
+              className="rounded-3xl overflow-hidden border border-[#F1E2CF]"
+              colorsArr={["#FFF6ED", "#FFE4CC"]}
             >
-              <View className="flex-row items-center gap-3">
-                <View className="flex-1 gap-1">
-                  <View className="self-start flex-row items-center gap-1.5 bg-white/25 rounded-full px-2.5 py-1">
-                    <Ionicons name="storefront" size={12} color="#fff" />
-                    <Text className="text-white text-[11px] font-extrabold uppercase tracking-wider">
-                      WONPET Marketplace
-                    </Text>
-                  </View>
-                  <Text className="text-white text-xl font-black mt-1">
-                    Find a new best friend
-                  </Text>
-                  <Text className="text-white/90 text-[13px]">
-                    Pets &amp; pre-loved gear from owners near you
-                  </Text>
+              <View className="p-5">
+                {/* quiet decoration (same paw + heart touches as the web) */}
+                <View pointerEvents="none" style={{ position: "absolute", right: -10, bottom: -14, transform: [{ rotate: "-14deg" }] }}>
+                  <Ionicons name="paw" size={104} color="#FFB877" style={{ opacity: 0.35 }} />
                 </View>
-                <View className="w-14 h-14 rounded-2xl bg-white items-center justify-center overflow-hidden">
-                  <Image
-                    source={require("../../assets/logo.png")}
-                    style={{ width: 44, height: 44 }}
-                    resizeMode="contain"
-                  />
+                <View pointerEvents="none" style={{ position: "absolute", right: 70, top: 14, transform: [{ rotate: "-12deg" }] }}>
+                  <Ionicons name="heart-outline" size={22} color={colors.primary} style={{ opacity: 0.6 }} />
+                </View>
+
+                <View className="flex-row items-start gap-3">
+                  <View className="flex-1 gap-1.5">
+                    <View className="self-start flex-row items-center gap-1.5 bg-white/80 border border-[#F1E2CF] rounded-full px-2.5 py-1">
+                      <Ionicons name="storefront" size={12} color={colors.primary} />
+                      <Text className="text-primary text-[11px] font-extrabold uppercase tracking-wider">
+                        WONPET Marketplace
+                      </Text>
+                    </View>
+                    <Text className="text-ink text-[22px] font-black leading-7 mt-1">
+                      Give pre-loved pet essentials <Text className="text-primary">a new home</Text>
+                    </Text>
+                    <Text className="text-muted text-[13px] leading-5 pr-4">
+                      Quality, affordable and sustainable pet finds from pet lovers like you.
+                    </Text>
+                    <Pressable
+                      onPress={explore}
+                      accessibilityRole="button"
+                      accessibilityLabel="Explore listings"
+                      className="self-start mt-2 rounded-full overflow-hidden shadow-md shadow-orange-300 active:opacity-90"
+                    >
+                      <Gradient className="flex-row items-center gap-2 px-5 py-3" colorsArr={["#FF8A1F", "#FF5A00"]}>
+                        <Text className="text-white font-extrabold text-[14px]">Explore listings</Text>
+                        <Ionicons name="arrow-forward" size={15} color="#fff" />
+                      </Gradient>
+                    </Pressable>
+                  </View>
+                  <View className="w-14 h-14 rounded-2xl bg-white border border-[#F1E2CF] items-center justify-center overflow-hidden">
+                    <Image
+                      source={require("../../assets/logo.png")}
+                      style={{ width: 44, height: 44 }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 </View>
               </View>
             </Gradient>
 
-            {/* quick actions */}
+            {/* quick actions (mobile keeps Chats + Saved here; the web has them in its header) */}
             <View className="flex-row gap-2">
               <QuickAction
                 icon="chatbubble-ellipses"
@@ -371,13 +438,12 @@ export default function ResellScreen({ navigation }: any) {
               />
             </View>
 
-            {/* stats */}
-            {!browsing && <StatRow stats={stats} />}
-
             {/* search + filters */}
             <SearchBar
               value={q}
               onChangeText={setQ}
+              onCamera={photoSearch}
+              scanning={scanning}
               placeholder="Search pets, products, breeds…"
               trailing={{
                 icon: "options-outline",
@@ -386,58 +452,69 @@ export default function ResellScreen({ navigation }: any) {
                 onPress: () => setFilterOpen(true),
               }}
             />
+            {photo && <PhotoItemChips items={photo.items} activeTerm={photo.term} query={q} onPick={pickPhotoItem} />}
 
             {/* category chips */}
             <FilterChips
               options={tabOptions}
               active={tab === "All" ? [] : [tab]}
-              onChange={(next) => setTab(next.length ? next[next.length - 1] : "All")}
+              onChange={(next) => pickTab(next.length ? next[next.length - 1] : "All")}
               allCount={available.length}
             />
 
+            {/* Pets -> Dogs / Cats / Birds ... */}
+            {tab === "Pets" && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="-mx-4 grow-0"
+                contentContainerClassName="gap-2 px-4"
+              >
+                {Object.keys(PET_SUBTABS).map((k) => (
+                  <Pressable
+                    key={k}
+                    onPress={() => setSubTab(k)}
+                    className={cn("px-3.5 py-1.5 rounded-full", subTab === k ? "bg-primary" : "bg-neutral-100")}
+                  >
+                    <Text className={cn("text-xs font-bold", subTab === k ? "text-white" : "text-muted")}>{k}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* quick filters */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="-mx-4 grow-0"
+              contentContainerClassName="gap-2 px-4 items-center"
+            >
+              <Text className="text-[13px] font-extrabold text-ink mr-1">Quick Filters</Text>
+              <QuickChip icon="location" label="Nearby" on={filters.distance === "10"} onPress={toggleNearby} />
+              <QuickChip icon="pricetag" label="Under ₹1,000" on={filters.max === "1000"} onPress={toggleUnder} />
+              <QuickChip icon="sparkles" label="Like New" on={filters.condition === "Like New"} onPress={toggleLikeNew} />
+              <QuickChip icon="calendar" label="Recently Added" on={recentOnly} onPress={() => setRecentOnly((v) => !v)} />
+            </ScrollView>
+
             {!browsing && (
-              <>
-                <Rail
-                  title="Trending This Week"
-                  icon="flame"
-                  tint="bg-red-soft"
-                  color={colors.red}
-                  data={trendingList}
-                  onOpen={open}
-                  emptyText={
-                    trending === "Near You"
-                      ? nearLabel
-                        ? `No listings near ${nearLabel} yet. Try Most Viewed or Newest.`
-                        : "Turn on location access (or save your location in Settings) to see listings near you."
-                      : undefined
-                  }
-                  right={
-                    <SegmentedTabs
-                      value={trending}
-                      onChange={setTrending}
-                      tabs={TRENDING.map((t) => ({ key: t, label: t }))}
-                    />
-                  }
-                />
-                <Rail
-                  title="Featured Listings"
-                  icon="star"
-                  tint="bg-yellow-soft"
-                  color={colors.yellow}
-                  data={featured}
-                  onOpen={open}
-                />
-              </>
+              <Rail
+                title="Featured Listings"
+                icon="star"
+                tint="bg-yellow-soft"
+                color={colors.yellow}
+                data={featured}
+                onOpen={open}
+              />
             )}
 
             {/* all listings header + sort */}
-            <View className="gap-3">
+            <View className="gap-3" onLayout={onGridLayout}>
               <SectionHeader
-                title={`${onlySaved ? "Saved" : "All"} Listings`}
-                subtitle={`${list.length} listing${list.length === 1 ? "" : "s"}`}
+                title={onlySaved ? "Saved Listings" : hasViewer ? "Popular near you" : "All Listings"}
+                subtitle={`${list.length} listing${list.length === 1 ? "" : "s"}${hasViewer && viewerLabel && !onlySaved ? ` · from ${viewerLabel}` : ""}`}
                 icon={
                   <IconBadge
-                    icon={onlySaved ? "heart" : "grid"}
+                    icon={onlySaved ? "heart" : hasViewer ? "flame" : "grid"}
                     tint={onlySaved ? "bg-red-soft" : "bg-primary-soft"}
                     color={onlySaved ? colors.red : colors.primary}
                   />
@@ -481,20 +558,19 @@ export default function ResellScreen({ navigation }: any) {
           </View>
         }
         ListFooterComponent={
-          <View>
+          <View className="gap-4">
             {list.length > 0 && <LoadMoreFooter hasMore={hasMore} total={list.length} noun="listings" />}
-            {/* recently viewed sits after the last listing, so only show it once everything is loaded */}
+            {/* these sit after the last listing, so only show them once everything is loaded */}
+            {!hasMore && <SafetyCard />}
             {!hasMore && !browsing && recents.length ? (
-              <View className="mt-2">
-                <Rail
-                  title="Recently Viewed"
-                  icon="time"
-                  tint="bg-blue-soft"
-                  color={colors.blue}
-                  data={recents}
-                  onOpen={open}
-                />
-              </View>
+              <Rail
+                title="Recently Viewed"
+                icon="time"
+                tint="bg-blue-soft"
+                color={colors.blue}
+                data={recents}
+                onOpen={open}
+              />
             ) : null}
           </View>
         }
@@ -517,6 +593,8 @@ export default function ResellScreen({ navigation }: any) {
         value={filters}
         onClose={() => setFilterOpen(false)}
         onApply={setFilters}
+        hasViewer={hasViewer}
+        viewerLabel={viewerLabel}
       />
     </View>
   );

@@ -19,6 +19,7 @@ import LanguageSection from '../../components/settings/LanguageSection';
 import FaqSection from '../../components/settings/FaqSection';
 import ContactSection from '../../components/settings/ContactSection';
 import SharedWithMeSection from '../../components/settings/SharedWithMeSection';
+import SubscriptionSection from '../../components/settings/SubscriptionSection';
 import { SwitchAccountCard } from '../../components/ProfileSwitcher';
 import { DOCTOR_DOCUMENT_TYPES } from '../../data/settings';
 import { KycStatus, kycService } from '../../services/kyc.service';
@@ -30,13 +31,14 @@ import { useLanguage } from '../../context/LanguageContext';
 import { headerLocation } from '../../utils/location';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Key = 'profile' | 'clinic' | 'kyc' | 'documents' | 'prefs' | 'shared' | 'language' | 'faq' | 'support';
+type Key = 'profile' | 'clinic' | 'kyc' | 'subscription' | 'documents' | 'prefs' | 'shared' | 'language' | 'faq' | 'support';
 
 const DocumentsBody = () => <DocumentsSection types={DOCTOR_DOCUMENT_TYPES} />;
 const sections: Record<Key, { title: string; icon: IconName; Body: React.ComponentType<any> }> = {
   profile: { title: 'Profile', icon: 'person-outline', Body: DoctorProfileForm },
   clinic: { title: 'Clinic details', icon: 'medkit-outline', Body: ClinicDetailsSection },
   kyc: { title: 'KYC & payouts', icon: 'card-outline', Body: KycSection },
+  subscription: { title: 'Subscription', icon: 'card-outline', Body: SubscriptionSection },
   documents: { title: 'Documents', icon: 'document-text-outline', Body: DocumentsBody },
   prefs: { title: 'Notification settings', icon: 'notifications-outline', Body: NotificationsSection },
   shared: { title: 'Shared With Me', icon: 'share-social-outline', Body: SharedWithMeSection },
@@ -49,7 +51,7 @@ const toKey = (k?: string): Key | null => (k && k in sections ? (k as Key) : nul
 // sections that draw their own cards, so they are not wrapped in the white Card
 const NO_CARD: Key[] = ['profile', 'clinic', 'kyc', 'prefs'];
 // sections whose data comes from the settings API - they wait for the first load so their forms start with real values
-const SERVER_BACKED: Key[] = ['clinic', 'documents', 'prefs', 'shared'];
+const SERVER_BACKED: Key[] = ['clinic', 'subscription', 'documents', 'prefs', 'shared'];
 
 type Item =
   | { kind: 'page'; key: Key; title: string; hint: string; icon: IconName; tone: MenuTone }
@@ -70,6 +72,7 @@ const page = (key: Key, hint: string, tone: MenuTone): Item => ({ kind: 'page', 
 const ACCOUNT: Item[] = [
   page('clinic', 'Clinic name, specialization, address', 'orange'),
   page('kyc', 'Bank details to receive payouts', 'green'),
+  page('subscription', 'Plans & billing', 'purple'),
   page('documents', 'Medical licence, identity proof', 'purple'),
 ];
 const PREFS: Item[] = [
@@ -91,7 +94,7 @@ export default function DoctorProfileScreen({ navigation, route }: any) {
   const { user, signOut } = useAuth();
   const { profile, status, unread } = useDoctor();
   const { totalUnread } = useChat();
-  const { info, documents, ready, invitations } = useSettings();
+  const { info, documents, ready, invitations, subscription, expiredPlan, plans } = useSettings();
   const { language } = useLanguage();
   const [open, setOpen] = useState<Key | null>(toKey(route.params?.open));
   const [statusOpen, setStatusOpen] = useState(false);
@@ -140,6 +143,7 @@ export default function DoctorProfileScreen({ navigation, route }: any) {
     if (it.key === 'kyc' && kyc) return { chip: KYC_STATUS[kyc] };
     if (it.key === 'documents' && ready) return { text: `${docsDone}/${DOCTOR_DOCUMENT_TYPES.length}` };
     if (it.key === 'language') return { text: language.label };
+    if (it.key === 'subscription' && ready) return subscription ? { text: plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId } : expiredPlan ? { chip: { label: 'Ended', tone: 'red' as Tone } } : { text: 'Free' };
     if (it.key === 'shared' && pendingInvites > 0) return { chip: { label: `${pendingInvites} new`, tone: 'yellow' as Tone } };
     return {};
   };

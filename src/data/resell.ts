@@ -15,7 +15,20 @@ export const CATEGORY_EMOJI: Record<string, string> = {
   Dog: '🐕', Cat: '🐈', Bird: '🦜', 'Aquatic Pet': '🐠', 'Small Pet': '🐇', Reptile: '🦎',
   Food: '🍖', Accessories: '🎀', Toys: '🧸', Medicine: '💊', Health: '🩺', Grooming: '✂️', Beds: '🛏️', Cages: '🏠', Clothing: '👕', Others: '📦',
 };
-export const SORT_OPTIONS = ['Newest First', 'Price: Low to High', 'Price: High to Low', 'Most Viewed'] as const;
+export const SORT_OPTIONS = ['Recommended', 'Price: Low to High', 'Price: High to Low', 'Most Viewed'] as const; // same as the web; Recommended = nearest first
+/** Distance from the buyer (km) - same ranges as the web. "20+" means farther than 20 km. */
+export const DISTANCE_OPTIONS = [
+  { value: 'any', label: 'Any distance' },
+  { value: '5', label: 'Within 5 km' },
+  { value: '10', label: 'Within 10 km' },
+  { value: '20', label: 'Up to 20 km' },
+  { value: '20+', label: 'More than 20 km' },
+] as const;
+export const withinDistance = (l: { distanceKm?: number }, range: string) =>
+  range === 'any' || (typeof l.distanceKm === 'number' && (range === '20+' ? l.distanceKm > 20 : l.distanceKm <= Number(range)));
+/** Second row of chips under the "Pets" tab. */
+export const PET_SUBTABS: Record<string, string> = { All: 'All', Dogs: 'Dog', Cats: 'Cat', Birds: 'Bird', 'Aquatic Pets': 'Aquatic Pet', 'Small Pets': 'Small Pet', Reptiles: 'Reptile' };
+export const SAFETY_TIPS = ['Meet the seller in a public place.', 'Check the item condition before payment.', 'Avoid advance payments.', "Verify the pet's health before you pay.", 'Bring a friend or family member along.'];
 export const TABS = ['All', 'Pets', 'Accessories', 'Beds', 'Grooming', 'More'] as const;
 
 export type Condition = (typeof CONDITIONS)[number];
@@ -24,6 +37,8 @@ export type Listing = {
   condition: Condition; price: number; originalPrice?: number; quantity: number; location: string; description: string;
   emoji: string; photos: string[]; sellerId: string; status: 'Available' | 'Sold' | 'Reserved'; isActive: boolean; isFeatured: boolean;
   views: number; favouritesCount: number; createdAt: string;
+  /** Km from the buyer - only set when the list was fetched with the buyer's location. */
+  distanceKm?: number;
   /** Set by the API mapper. `sellerId` is "me" for your own listings; `sellerUserId` is always the real user id. */
   customCategory?: string; sellerUserId?: string; seller?: Seller;
 };

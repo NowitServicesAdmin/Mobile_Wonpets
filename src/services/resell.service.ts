@@ -40,15 +40,22 @@ const toForm = (p: Partial<ListingInput>) => {
 };
 const multipart = { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000 };
 
+/** Where the buyer is - the API then sends every listing back with its distanceKm. */
+export type Viewer = { lat: number; lng: number } | null;
+const mapWithDistance = (l: any, meId: string): Listing => {
+  const m = mapListing(l, meId);
+  return typeof l.distanceKm === 'number' ? { ...m, distanceKm: l.distanceKm } : m;
+};
+
 export type ListingQuery = { page?: number; limit?: number; keyword?: string; category?: string; sort?: string };
 
 export const resellService = {
   /** Every available listing (pages are merged - the marketplace screen filters and sorts on the device). */
-  async all(meId: string, maxPages = 4): Promise<Listing[]> {
+  async all(meId: string, viewer: Viewer = null, maxPages = 4): Promise<Listing[]> {
     const out: Listing[] = [];
     for (let page = 1; page <= maxPages; page++) {
-      const { data } = await api.get('/resell', { params: { page, limit: 50 } });
-      out.push(...(data.listings || []).map((l: any) => mapListing(l, meId)));
+      const { data } = await api.get('/resell', { params: { page, limit: 50, ...(viewer ? { lat: viewer.lat, lng: viewer.lng } : {}) } });
+      out.push(...(data.listings || []).map((l: any) => mapWithDistance(l, meId)));
       if (page >= (data.pages || 1)) break;
     }
     return out;

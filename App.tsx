@@ -21,6 +21,7 @@ import { LocationProvider } from './src/context/LocationContext';
 import { LanguageProvider } from './src/context/LanguageContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AlertHost } from './src/components/WonPetsAlert';
+import RazorpayWebViewHost from './src/components/RazorpayWebViewHost';
 
 /** Doctors get their own (much lighter) provider tree - none of the pet-owner data (pets, cart, resell…) is loaded for them.
  *  ManagedProvider + DoctorSharedBridge add "Shared With Me" (pets other owners share with the doctor), same as for pet owners. */
@@ -86,6 +87,7 @@ export default function App() {
       <LanguageProvider>
         <AuthProvider>
           <Shell />
+          <RazorpayWebViewHost />
         </AuthProvider>
       </LanguageProvider>
     </SafeAreaProvider>

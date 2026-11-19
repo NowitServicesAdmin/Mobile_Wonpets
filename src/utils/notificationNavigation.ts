@@ -65,6 +65,7 @@ export function getDoctorNotificationTarget(n: { actionUrl?: string; type?: stri
   const appt = param(url, 'appointmentId');
   if (appt) return { name: 'DoctorAppointment', params: { id: appt } };
   if (/\/chat(\?|$)/.test(url)) return { name: 'Chat' };
+  if (/subscri/i.test(url)) return { name: 'DoctorMain', params: { screen: 'DoctorProfile', params: { open: 'subscription', at: Date.now() } } };
   if (/\/doctor\/(schedule|dashboard)/.test(url)) return { name: 'DoctorMain', params: { screen: 'DoctorSchedule' } };
   switch (n.type) {
     case 'Appointment': return { name: 'DoctorMain', params: { screen: 'DoctorSchedule' } };
@@ -88,7 +89,7 @@ export function getStoreNotificationTarget(n: { actionUrl?: string; type?: strin
   if (/\/management\/products/.test(url)) return { name: 'SMProducts' };
   if (/\/management\/offers/.test(url)) return { name: 'SMOffers' };
   if (/\/earnings/.test(url)) return { name: 'SMEarnings' };
-  if (/\/settings/.test(url)) return tab('SMProfile', { open: /kyc/i.test(url) ? 'kyc' : /document/i.test(url) ? 'documents' : 'store', at: Date.now() });
+  if (/\/settings/.test(url)) return tab('SMProfile', { open: /subscri/i.test(url) ? 'subscription' : /kyc/i.test(url) ? 'kyc' : /document/i.test(url) ? 'documents' : 'store', at: Date.now() });
   const text = `${n.title ?? ''} ${n.body ?? ''}`.toLowerCase();
   switch (n.type) {
     case 'Order': return tab('SMOrders');

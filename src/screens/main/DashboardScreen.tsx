@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useMemo, useState } from "react";
+import { RefreshControl, ScrollView } from "react-native";
 import { colors } from "../../theme";
-import { Button, Card, SectionHeader, T, cn } from "../../components/ui";
-import PetHeroBanner from "../../components/dashboard/PetHeroBanner";
+import PetHeroBanner, { ApptStats } from "../../components/dashboard/PetHeroBanner";
+// import NextAppointmentCard from "../../components/dashboard/NextAppointmentCard";
+import PlanEndedBanner from "../../components/settings/PlanEndedBanner";
 import QuickActions from "../../components/dashboard/QuickActions";
 import MyPetsSection from "../../components/dashboard/MyPetsSection";
 import TodaysSchedule from "../../components/dashboard/TodaysSchedule";
@@ -15,42 +15,9 @@ import { facts } from "../../data/mock";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { ScheduleItem, usePets } from "../../context/PetsContext";
+import type { Appointment } from "../../data/mock";
 
 import { DashboardSkeleton } from "../../components/Skeletons";
-// const quick = [
-//   {
-//     label: "Book Appointment",
-//     icon: "calendar-outline",
-//     box: "bg-orange-200",
-//     fg: colors.primaryDark,
-//     text: "text-primary-dark",
-//     go: "BookAppointment",
-//   },
-//   {
-//     label: "Buy Products",
-//     icon: "bag-handle-outline",
-//     box: "bg-purple-soft",
-//     fg: colors.purple,
-//     text: "text-purple",
-//     go: "Store",
-//   },
-//   {
-//     label: "Resell Items",
-//     icon: "pricetag-outline",
-//     box: "bg-pink-soft",
-//     fg: colors.pink,
-//     text: "text-pink",
-//     go: "Resell",
-//   },
-//   {
-//     label: "Chat with Vet",
-//     icon: "chatbubble-outline",
-//     box: "bg-green-soft",
-//     fg: colors.green,
-//     text: "text-green",
-//     go: "Chat",
-//   },
-// ] as const;
 
 const orderCounts = (orders: { status: string }[]) => ({
   Pending: orders.filter((o) => o.status === "Pending").length,
@@ -59,6 +26,36 @@ const orderCounts = (orders: { status: string }[]) => ({
   Delivered: orders.filter((o) => o.status === "Delivered").length,
   Cancelled: orders.filter((o) => o.status === "Cancelled").length,
 });
+
+const isCancelled = (st: string) => /cancel|reject|declin/i.test(st);
+
+/** Counts for the hero tiles - same buckets as the web dashboard. */
+const apptStats = (list: Appointment[]): ApptStats => {
+  const r = { upcoming: 0, inProgress: 0, completed: 0, cancelled: 0 };
+  list.forEach((a) => {
+    const st = (a.status || "").toLowerCase();
+    if (isCancelled(st)) r.cancelled++;
+    else if (st === "completed") r.completed++;
+    else if (st.replace(/[\s_-]/g, "") === "inprogress" || st === "ongoing") r.inProgress++;
+    else r.upcoming++;
+  });
+  return r;
+};
+
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** Soonest appointment from today onward that is not cancelled / completed. */
+const pickNext = (list: Appointment[]): Appointment | null => {
+  const today = todayIso();
+  return (
+    list
+      .filter((a) => a.isoDate && a.isoDate.slice(0, 10) >= today && !isCancelled(a.status || "") && a.status !== "Completed")
+      .sort((a, b) => (a.isoDate!.slice(0, 10)).localeCompare(b.isoDate!.slice(0, 10)) || String(a.time24 || "").localeCompare(String(b.time24 || "")))[0] || null
+  );
+};
 
 export default function DashboardScreen({ navigation, route }: any) {
   const { user } = useAuth();
@@ -77,6 +74,8 @@ export default function DashboardScreen({ navigation, route }: any) {
     deleteOwnerTask,
   } = usePets();
   const [fact, setFact] = useState(0);
+  const stats = useMemo(() => apptStats(appointments), [appointments]);
+  const nextAppointment = useMemo(() => pickNext(appointments), [appointments]);
 
   const openPet = (id: string) => navigation.navigate("PetProfile", { id });
 
@@ -115,58 +114,18 @@ export default function DashboardScreen({ navigation, route }: any) {
   return (
     <ScrollView
       className="flex-1 bg-cream"
-      contentContainerClassName="p-4 gap-[18px] pb-10"
+      contentContainerClassName="p-3.5 gap-3 pb-8"
       refreshControl={<RefreshControl refreshing={loading} onRefresh={async () => { await Promise.all([refreshAll(), refreshOrders()]); }} tintColor={colors.primary} />}
     >
-      <PetHeroBanner
-        userName={user?.name}
-        pets={pets}
-        daysWithApp={
-          user?.createdAt ? Math.max(1, Math.ceil((Date.now() - new Date(user.createdAt).getTime()) / 86400000)) : 1
-        }
-      />
+      <PlanEndedBanner onRenew={() => navigation.navigate('Settings', { open: 'subscription', at: Date.now() })} />
 
-      {/* Quick actions */}
-      {/* <Card className="border-amber-200">
-        <SectionHeader
-          title="Quick Actions"
-          icon={
-            <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center">
-              <Ionicons name="paw" size={18} color={colors.primary} />
-            </View>
-          }
-        />
-        <View className="flex-row flex-wrap gap-3">
-          {quick.map((q) => (
-            <Pressable
-              key={q.label}
-              className={cn(
-                "w-[47.5%] rounded-2xl p-4 items-center gap-2 active:opacity-80",
-                q.box,
-              )}
-              onPress={() => navigation.navigate(q.go)}
-            >
-              <View className="w-11 h-11 rounded-[14px] bg-white items-center justify-center">
-                <Ionicons name={q.icon} size={22} color={q.fg} />
-              </View>
-              <Text className={cn("font-bold text-[13px] text-center", q.text)}>
-                {q.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable
-          onPress={() => toast.info("Support is coming soon.")}
-          className="flex-row items-center justify-between mt-4 pt-3.5 border-t border-line"
-        >
-          <Text className="text-muted font-medium text-sm">Need help?</Text>
-          <Text className="text-primary font-bold text-sm">
-            Contact Support
-          </Text>
-        </Pressable>
-      </Card> */}
-            {/* Quick actions */}
-      <QuickActions onGo={(screen) => navigation.navigate(screen)} onSupport={() => navigation.navigate("Settings", { open: "support", at: Date.now() })} />
+      <PetHeroBanner userName={user?.name} pets={pets} stats={stats} />
+
+      {/* main shortcuts sit right under the hero so they are visible without scrolling */}
+      <QuickActions
+        onGo={(screen) => navigation.navigate(screen)}
+        onSupport={() => navigation.navigate("Settings", { open: "support", at: Date.now() })}
+      />
 
       <MyPetsSection
         pets={pets}
@@ -191,6 +150,12 @@ export default function DashboardScreen({ navigation, route }: any) {
         initialPetId={route?.params?.petId}
       />
 
+      {/* <NextAppointmentCard
+        appointment={nextAppointment}
+        onOpen={() => navigation.navigate("Appointments")}
+        onBook={() => navigation.navigate("BookAppointment")}
+      /> */}
+
       <PetHealthOverview
         pets={pets}
         appointments={appointments}
@@ -204,7 +169,6 @@ export default function DashboardScreen({ navigation, route }: any) {
         }
       />
 
-            {/* Animal fact */}
       <AnimalFactCard
         facts={facts}
         index={fact}

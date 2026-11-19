@@ -53,11 +53,26 @@ export function ListingCard({ item, onPress, compact }: { item: Listing; onPress
         {off > 0 && <Text className="text-muted text-xs line-through">{inr(item.originalPrice!)}</Text>}
         {off > 0 && <Text className="text-green text-[10px] font-extrabold">{off}% OFF</Text>}
       </View>
-      <View className="flex-row items-center justify-between gap-2">
-        <View className="flex-row items-center gap-1 flex-1">
-          <Ionicons name="location" size={11} color={colors.primary} />
-          <Text className="text-[11px] text-muted flex-1" numberOfLines={1}>{item.location.split(',')[0]} · {timeAgo(item.createdAt)}</Text>
-        </View>
+      {/* where it is + how far (distance only when the buyer's location is known) */}
+      <View className="flex-row items-center gap-1">
+        <Ionicons name="location" size={11} color={colors.primary} />
+        <Text className="text-[11px] text-muted flex-shrink" numberOfLines={1}>{item.location.split(',')[0]}</Text>
+        {typeof item.distanceKm === 'number' && <Text className="text-[11px] text-primary-dark font-bold">• {item.distanceKm} km</Text>}
+      </View>
+      {/* seller (like the web card) or, on the small rail cards, how long ago it was listed */}
+      <View className="flex-row items-center justify-between gap-2 pt-0.5">
+        {!compact && (item.sellerId === 'me' || item.seller) ? (
+          <View className="flex-row items-center gap-1.5 flex-1">
+            {item.seller?.image ? (
+              <Image source={{ uri: item.seller.image }} className="w-5 h-5 rounded-full" />
+            ) : (
+              <View className="w-5 h-5 rounded-full bg-primary-soft items-center justify-center"><Text className="text-primary text-[10px] font-extrabold">{(item.sellerId === 'me' ? 'Y' : item.seller?.name || '?').charAt(0).toUpperCase()}</Text></View>
+            )}
+            <Text className="text-[11px] font-semibold text-ink flex-1" numberOfLines={1}>{item.sellerId === 'me' ? 'You' : item.seller?.name}</Text>
+          </View>
+        ) : (
+          <Text className="text-[11px] text-muted flex-1" numberOfLines={1}>{timeAgo(item.createdAt)}</Text>
+        )}
         <View className="flex-row items-center gap-1"><Ionicons name="eye-outline" size={11} color={colors.muted} /><Text className="text-[11px] text-muted">{item.views}</Text></View>
       </View>
     </Pressable>

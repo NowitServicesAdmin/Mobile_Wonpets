@@ -65,9 +65,9 @@ export function DateTile({ a, size = 60 }: { a: Appointment; size?: number }) {
 
 export type CardAction = { label: string; icon: IconName; onPress: () => void; solid?: boolean; danger?: boolean };
 
-function Action({ label, icon, onPress, solid, danger }: CardAction) {
+function Action({ label, icon, onPress, solid, danger, compact }: CardAction & { compact?: boolean }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" className={cn('flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl active:opacity-80', solid ? 'bg-primary' : danger ? 'bg-red-soft' : 'bg-primary-soft')}>
+    <Pressable onPress={onPress} accessibilityRole="button" className={cn('flex-1 flex-row items-center justify-center gap-1.5 rounded-xl active:opacity-80', compact ? 'py-2' : 'py-2.5', solid ? 'bg-primary' : danger ? 'bg-red-soft' : 'bg-primary-soft')}>
       <Ionicons name={icon} size={15} color={solid ? '#fff' : danger ? colors.red : colors.primary} />
       <Text className={cn('text-[13px] font-bold', solid ? 'text-white' : danger ? 'text-red' : 'text-primary')}>{label}</Text>
     </Pressable>
@@ -78,12 +78,14 @@ function Action({ label, icon, onPress, solid, danger }: CardAction) {
  * Appointment row: status-tinted date tile, pet + status pill, time / visit type / doctor.
  * The whole card opens the details screen; quick actions (join / prescription / reschedule) sit underneath when they apply.
  */
-export default function AppointmentCard({ item, onOpen, onJoin, onPrescription, onReschedule, actions, viewer = 'owner' }: {
+export default function AppointmentCard({ item, onOpen, onJoin, onPrescription, onReschedule, actions, viewer = 'owner', compact = false }: {
   item: Appointment; onOpen: () => void; onJoin?: () => void; onPrescription?: () => void; onReschedule?: () => void;
   /** Extra / custom buttons under the card (the doctor's Accept / Start / Complete…). */
   actions?: CardAction[];
   /** Whose point of view: the owner sees the doctor, the doctor sees the pet owner. */
   viewer?: 'owner' | 'doctor';
+  /** Slimmer two-line row (smaller date tile, tighter padding) so more appointments fit on screen. */
+  compact?: boolean;
 }) {
   const buttons: CardAction[] = [
     ...(onJoin ? [{ label: 'Join now', icon: 'videocam' as IconName, onPress: onJoin, solid: true }] : []),
@@ -94,6 +96,41 @@ export default function AppointmentCard({ item, onOpen, onJoin, onPrescription, 
   const hasActions = buttons.length > 0;
   const party = viewer === 'doctor' ? (item.owner ?? 'Pet owner') : (item.doctor ?? 'Doctor to be assigned');
   const m = STATUS_META[item.status] ?? STATUS_META.Pending;
+  const partyLine = `${party}${viewer === 'doctor' && item.reason ? ` · ${item.reason}` : item.visitType ? ` · ${item.visitType}` : ''}`;
+  const emergency = item.mode === 'Emergency';
+
+  if (compact) {
+    return (
+      <View className="bg-white rounded-2xl border border-line overflow-hidden shadow-sm shadow-orange-900/10">
+        <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`${item.pet}, ${item.status} appointment. View details`} className="flex-row items-center gap-3 p-3 active:bg-cream">
+          <DateTile a={item} size={46} />
+          <View className="flex-1 gap-0.5">
+            <View className="flex-row items-center justify-between gap-2">
+              <View className="flex-row items-center gap-1.5 flex-1">
+                <PetAvatar emoji={item.emoji} image={item.petImage} size={22} />
+                <Text className="text-[15px] font-extrabold text-ink flex-shrink" numberOfLines={1}>{item.pet}</Text>
+              </View>
+              <StatusPill status={item.status} />
+            </View>
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons name="time-outline" size={13} color={colors.primary} />
+              <Text className="text-[12.5px] font-bold text-ink">{item.time}</Text>
+              <Ionicons name={MODE_ICON[item.mode] ?? 'medical-outline'} size={13} color={emergency ? colors.red : colors.muted} />
+              <Text className={cn('text-[12px] flex-shrink', emergency ? 'text-red font-bold' : 'text-muted')} numberOfLines={1}>{item.mode}</Text>
+            </View>
+            <Text className="text-[12px] text-muted" numberOfLines={1}>{partyLine}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#CDBFB0" />
+        </Pressable>
+        {hasActions && (
+          <View style={{ backgroundColor: m.soft + '55' }} className="flex-row gap-2 px-3 py-2 border-t border-orange-100">
+            {buttons.map((b) => <Action key={b.label} {...b} compact />)}
+          </View>
+        )}
+      </View>
+    );
+  }
+
   return (
     <View className="bg-white rounded-3xl border border-line overflow-hidden shadow-sm shadow-orange-900/10">
       <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={`${item.pet}, ${item.status} appointment. View details`} className="flex-row gap-3.5 p-3.5 active:bg-cream">

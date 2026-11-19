@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Empty, IconButton, T, cn } from '../../components/ui';
@@ -12,6 +12,9 @@ import { CategoryRowSkeleton, OfferCarouselSkeleton, ProductGridSkeleton } from 
 import { errorMessage } from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import { toast } from '../../components/WonPetsAlert';
+import { searchByPhoto } from '../../utils/imageSearch';
+import PhotoItemChips from '../../components/common/PhotoItemChips';
+import { VisualSearchItem } from '../../services/shared.service';
 
 export function ProductCard({ item, navigation }: { item: Product; navigation: any }) {
   const { wishlist, toggleWishlist, addToCart } = useCart();
@@ -80,6 +83,8 @@ export default function StoreScreen({ navigation, route }: any) {
   const [moreFailed, setMoreFailed] = useState(false);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [scanning, setScanning] = useState(false); // "search by photo" in progress
+  const [photo, setPhoto] = useState<{ term: string; items: VisualSearchItem[] } | null>(null); // everything spotted in the last photo
   const reqId = useRef(0);
   const listRef = useRef<FlatList<Product>>(null);
 
@@ -138,6 +143,30 @@ export default function StoreScreen({ navigation, route }: any) {
   const applyFilters = (f: StoreFilters) => { setFilters(f); toTop(); };
   const clearAll = () => { setFilters(noStoreFilters); setQ(''); if (offerStore) navigation.setParams({ storeManagerId: undefined, onOffer: undefined, category: undefined }); };
 
+  // camera icon: take / pick a photo, the backend returns a term that really exists in the store
+  const photoSearch = async () => {
+    if (scanning) return;
+    setScanning(true);
+    const r = await searchByPhoto('store');
+    setScanning(false);
+    if (!r) return;
+    setFilters(noStoreFilters); // clear anything that would hide the match
+    if (offerStore) navigation.setParams({ storeManagerId: undefined, onOffer: undefined, category: undefined });
+    setQ(r.searchTerm);
+    setSearch(r.searchTerm); // no need to wait for the typing debounce
+    setPhoto({ term: r.searchTerm, items: r.items ?? [] });
+    toTop();
+  };
+
+  // tap another item that was in the photo
+  const pickPhotoItem = (it: VisualSearchItem) => {
+    setFilters(noStoreFilters);
+    setQ(it.searchTerm);
+    setSearch(it.searchTerm);
+    setPhoto((p) => (p ? { ...p, term: it.searchTerm } : p));
+    toTop();
+  };
+
   const openOffer = (t: OfferTarget) => {
     if (t.kind === 'product') return navigation.navigate('ProductDetail', { id: t.id });
     if (t.kind === 'products') return navigation.navigate('OfferProducts', { ids: t.ids, title: t.title });
@@ -180,8 +209,11 @@ export default function StoreScreen({ navigation, route }: any) {
             <Ionicons name="search-outline" size={18} color={colors.muted} />
             <TextInput value={q} onChangeText={setQ} placeholder="Search for pets, food, toys, grooming…" placeholderTextColor="#B8AEA5" className="flex-1 py-3" returnKeyType="search" />
             {!!q && <Pressable hitSlop={8} onPress={() => setQ('')} accessibilityLabel="Clear search"><Ionicons name="close-circle" size={17} color="#C9BFB5" /></Pressable>}
-            <Pressable hitSlop={8} accessibilityLabel="Search by image" onPress={() => navigation.navigate('Search', { camera: true })}><Ionicons name="camera-outline" size={20} color={colors.primary} /></Pressable>
+            {scanning
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <Pressable hitSlop={8} accessibilityLabel="Search by photo" onPress={photoSearch}><Ionicons name="camera-outline" size={20} color={colors.primary} /></Pressable>}
           </View>
+          {photo && <PhotoItemChips items={photo.items} activeTerm={photo.term} query={q} onPick={pickPhotoItem} />}
 
           <View className="flex-row items-center gap-2.5">
             <View className="flex-row bg-amber-100 rounded-full p-1">

@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Card, T, cn } from '../ui';
 import PetAvatar from '../PetAvatar';
-import ProgressRing from '../ProgressRing';
-import CompletableRow, { AllDoneNote } from './CompletableRow';
+import { Panel } from '../doctor/DoctorUI';
+import CompletableRow, { ROW_EXIT_TOTAL_MS } from './CompletableRow';
 import type { Pet } from '../../data/mock';
 import type { ScheduleItem } from '../../context/PetsContext';
 
@@ -34,8 +34,27 @@ function itemStyle(t: ScheduleItem): { icon: IconName; box: string; fg: string }
   return { icon: 'calendar-outline', box: 'bg-green-soft', fg: colors.green };
 }
 
-// the task list scrolls inside the card (roughly 4 rows visible) instead of stretching the whole dashboard
-const TASK_LIST_MAX_HEIGHT = 320;
+// Fixed-height rows (like the doctor dashboard): about four rows show, the rest scroll inside the card instead of stretching the page.
+const ROW_H = 50, ROW_GAP = 6, LIST_MAX = ROW_H * 4 + ROW_GAP * 3;
+
+/** Slim "all done" note once the last task has slid away (waits for the exit animation). */
+function DoneNote({ show }: { show: boolean }) {
+  const op = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!show) { op.setValue(0); return; }
+    Animated.timing(op, { toValue: 1, duration: 350, delay: ROW_EXIT_TOTAL_MS, useNativeDriver: true }).start();
+  }, [show]);
+  if (!show) return null;
+  return (
+    <Animated.View style={{ opacity: op }} className="flex-row items-center justify-center gap-2 py-3">
+      <Text className="text-2xl">🎉</Text>
+      <View>
+        <Text className="text-[14px] font-bold text-ink">All done for today</Text>
+        <Text className="text-[11px] text-muted">Completed tasks are tucked away.</Text>
+      </View>
+    </Animated.View>
+  );
+}
 
 export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDeleteTask, onPauseTask, onAddSchedule, onOpenPet, initialPetId }: Props) {
   const [idx, setIdx] = useState(0);
@@ -51,8 +70,8 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
 
   if (!pet) {
     return (
-      <Card className="items-center py-8">
-        <Text className="text-4xl mb-2">🐾</Text>
+      <Card className="items-center py-6">
+        <Text className="text-4xl mb-1">🐾</Text>
         <Text className={T.h3}>No pets yet</Text>
         <Text className={T.small + ' mt-1'}>Add your first furry friend to get started.</Text>
       </Card>
@@ -68,67 +87,63 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
   const pending = actionable.filter((t) => t.status !== 'completed');
   const pct = actionable.length ? Math.round((completed.length / actionable.length) * 100) : 0;
   const nextTask = tasks.find((t) => t.status !== 'completed');
+  const many = pets.length > 1;
 
   return (
-    <Card className="border-orange-100">
-      {/* Header */}
-      <View className="flex-row items-center gap-2.5 mb-3">
-        <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center"><Ionicons name="calendar-outline" size={19} color={colors.primary} /></View>
+    <Panel compact className="border-orange-100">
+      {/* Header: next task time replaces the old three-tile summary at the bottom */}
+      <View className="flex-row items-center gap-2 mb-2.5">
+        <View className="w-8 h-8 rounded-full bg-orange-100 items-center justify-center"><Ionicons name="calendar" size={15} color={colors.primary} /></View>
         <View className="flex-1">
-          <Text className={T.h2}>Today's Schedule</Text>
-          <Text className={T.small}>{pending.length} tasks remaining today</Text>
+          <Text maxFontSizeMultiplier={1.1} className="text-[15px] font-extrabold text-ink" numberOfLines={1}>Today's Schedule</Text>
+          <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted" numberOfLines={1}>
+            {pending.length} {pending.length === 1 ? 'task' : 'tasks'} left{nextTask ? ` · Next ${nextTask.time}` : ''}
+          </Text>
         </View>
-        <Pressable onPress={onAddSchedule} className="w-10 h-10 rounded-xl bg-primary items-center justify-center active:opacity-80">
-          <Ionicons name="alarm-outline" size={20} color="#fff" />
+        <Pressable onPress={onAddSchedule} accessibilityRole="button" accessibilityLabel="Add or manage tasks" className="w-9 h-9 rounded-xl bg-primary items-center justify-center active:opacity-80">
+          <Ionicons name="alarm-outline" size={18} color="#fff" />
         </Pressable>
       </View>
 
       {/* Pet switcher */}
-      <View className="flex-row items-center gap-2 mb-3">
-        <Pressable disabled={pets.length <= 1} onPress={prev} className={cn('w-9 h-9 rounded-full bg-orange-100 items-center justify-center', pets.length <= 1 && 'opacity-40')}>
-          <Ionicons name="chevron-back" size={18} color={colors.primary} />
-        </Pressable>
-        <Pressable onPress={() => onOpenPet(pet)} className="flex-1 flex-row items-center gap-2.5 px-3 py-2 rounded-2xl bg-orange-50 border border-orange-100">
-          <PetAvatar emoji={pet.emoji} image={pet.image} size={34} />
+      <View className="flex-row items-center gap-1.5 mb-2.5">
+        {many && (
+          <Pressable onPress={prev} accessibilityRole="button" accessibilityLabel="Previous pet" className="w-8 h-8 rounded-full bg-orange-100 items-center justify-center active:opacity-70">
+            <Ionicons name="chevron-back" size={16} color={colors.primary} />
+          </Pressable>
+        )}
+        <Pressable onPress={() => onOpenPet(pet)} accessibilityRole="button" accessibilityLabel={`Open ${pet.name}'s profile`} className="flex-1 flex-row items-center gap-2 px-2.5 py-1.5 rounded-xl bg-orange-50 border border-orange-100 active:opacity-80">
+          <PetAvatar emoji={pet.emoji} image={pet.image} size={28} />
           <View className="flex-1">
-            <Text className="font-bold text-sm text-ink" numberOfLines={1}>{pet.name}</Text>
-            <Text className="text-[11px] text-muted" numberOfLines={1}>{pet.breed}</Text>
+            <Text maxFontSizeMultiplier={1.1} className="font-bold text-[13px] text-ink" numberOfLines={1}>{pet.name}</Text>
+            <Text maxFontSizeMultiplier={1.1} className="text-[10px] text-muted" numberOfLines={1}>{pet.breed}</Text>
           </View>
+          <Ionicons name="chevron-forward" size={14} color="#CBD5E1" />
         </Pressable>
-        <Pressable disabled={pets.length <= 1} onPress={next} className={cn('w-9 h-9 rounded-full bg-orange-100 items-center justify-center', pets.length <= 1 && 'opacity-40')}>
-          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-        </Pressable>
-      </View>
-
-      {/* Progress */}
-      <View className="flex-row items-center gap-2 bg-orange-100 rounded-2xl p-2.5 mb-3">
-        <View className="bg-white/70 rounded-xl h-16 w-[70px] items-center justify-center">
-          <ProgressRing color={colors.primary} progress={pct / 100} size={52} stroke={5}>
-            <Text className="text-[11px] font-extrabold text-primary-dark">{pct}%</Text>
-          </ProgressRing>
-        </View>
-        {([['Completed', completed.length, 'text-green'], ['Remaining', pending.length, 'text-primary-dark'], ['Total', actionable.length, 'text-muted']] as const).map(([k, v, c]) => (
-          <View key={k} className="flex-1 bg-white/70 rounded-xl h-16 px-2.5 justify-center">
-            <Text className="text-[10px] font-medium text-muted">{k}</Text>
-            <Text className={cn('text-lg font-extrabold', c)}>{v}</Text>
-          </View>
-        ))}
+        {many && (
+          <Pressable onPress={next} accessibilityRole="button" accessibilityLabel="Next pet" className="w-8 h-8 rounded-full bg-orange-100 items-center justify-center active:opacity-70">
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          </Pressable>
+        )}
       </View>
 
       {tasks.length === 0 ? (
-        <View className="py-10 items-center">
-          <Text className="text-4xl mb-2">📅</Text>
-          <Text className={T.h3}>Nothing planned today</Text>
-          <Text className={T.small + ' mt-1 text-center'}>Enjoy your day or create a reminder for your pet.</Text>
+        <View className="flex-row items-center gap-3 bg-orange-50/60 border border-orange-100 rounded-2xl p-3">
+          <View className="w-9 h-9 rounded-xl bg-orange-100 items-center justify-center"><Ionicons name="calendar" size={17} color={colors.primary} /></View>
+          <View className="flex-1">
+            <Text className="text-[14px] font-bold text-ink">Nothing planned today</Text>
+            <Text className="text-[11px] text-muted" numberOfLines={1}>Enjoy your day or add a reminder.</Text>
+          </View>
         </View>
       ) : (
         <>
-          <ScrollView
-            nestedScrollEnabled
-            showsVerticalScrollIndicator
-            style={{ maxHeight: TASK_LIST_MAX_HEIGHT }}
-            contentContainerStyle={{ paddingBottom: 0 }}
-          >
+          {/* Progress: one slim bar instead of the old ring + three boxes */}
+          <View className="flex-row items-center gap-2 mb-2.5">
+            <View className="flex-1 h-1.5 bg-orange-100 rounded-full overflow-hidden"><View style={{ width: `${pct}%` }} className="h-full bg-primary rounded-full" /></View>
+            <Text maxFontSizeMultiplier={1.1} className="text-[11px] font-bold text-muted">{completed.length}/{actionable.length} done · {pct}%</Text>
+          </View>
+
+          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={tasks.length > 4} style={{ maxHeight: LIST_MAX }}>
             {tasks.map((task) => {
               const st = itemStyle(task);
               const isAppt = task.itemType === 'appointment';
@@ -136,57 +151,40 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
               // a completed task animates out of the list and is then hidden
               const isDone = task.status === 'completed';
               return (
-                <CompletableRow key={`${task.itemType}-${task.id}`} done={isDone}>
-                <View className={cn('flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', isDone ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
-                  <View className={cn('w-10 h-10 rounded-xl items-center justify-center', st.box)}><Ionicons name={st.icon} size={19} color={st.fg} /></View>
-                  <View className="flex-1">
-                    <Text maxFontSizeMultiplier={1.1} className={cn('text-[14px] font-extrabold', isDone ? 'line-through text-muted' : 'text-ink')} numberOfLines={1}>{task.title}</Text>
-                    <Text maxFontSizeMultiplier={1.1} className="text-[12px] text-muted mt-0.5" numberOfLines={1}>
-                      <Text className="font-bold text-primary">{task.time}</Text>{task.description ? `  ·  ${task.description}` : ''}
-                    </Text>
+                <CompletableRow key={`${task.itemType}-${task.id}`} done={isDone} gap={ROW_GAP}>
+                  <View style={{ height: ROW_H }} className={cn('flex-row items-center gap-2 rounded-2xl border px-2.5', isDone ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
+                    <View className={cn('w-9 h-9 rounded-xl items-center justify-center', st.box)}><Ionicons name={st.icon} size={17} color={st.fg} /></View>
+                    <View className="flex-1">
+                      <Text maxFontSizeMultiplier={1.1} className={cn('text-[13px] font-extrabold', isDone ? 'line-through text-muted' : 'text-ink')} numberOfLines={1}>{task.title}</Text>
+                      <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted" numberOfLines={1}>
+                        <Text className="font-bold text-primary">{task.time}</Text>{task.description ? `  ·  ${task.description}` : ''}
+                      </Text>
+                    </View>
+                    {isCustom && !isAppt && !isDone && (
+                      <View className="flex-row gap-1.5">
+                        <Pressable hitSlop={6} onPress={() => onPauseTask(task)} accessibilityLabel={`Pause ${task.title}`} className="w-7 h-7 rounded-full bg-white border border-line items-center justify-center"><Ionicons name="pause-outline" size={14} color="#64748B" /></Pressable>
+                        <Pressable hitSlop={6} onPress={() => onDeleteTask(task)} accessibilityLabel={`Delete ${task.title}`} className="w-7 h-7 rounded-full bg-white border border-line items-center justify-center"><Ionicons name="trash-outline" size={13} color="#64748B" /></Pressable>
+                      </View>
+                    )}
+                    {isAppt ? (
+                      <View className="bg-blue-soft px-2 py-1 rounded-full">
+                        <Text maxFontSizeMultiplier={1.1} className="text-[10px] font-bold text-blue">{task.apptStatus || 'Confirmed'}</Text>
+                      </View>
+                    ) : isDone ? (
+                      <View className="w-8 h-8 rounded-full bg-green-soft items-center justify-center"><Ionicons name="checkmark" size={17} color={colors.green} /></View>
+                    ) : (
+                      <Pressable onPress={() => completeTask(task)} accessibilityRole="button" accessibilityLabel={`Mark ${task.title} complete`} className="w-8 h-8 rounded-full bg-primary items-center justify-center active:opacity-80">
+                        <Ionicons name="checkmark" size={18} color="#fff" />
+                      </Pressable>
+                    )}
                   </View>
-                  {isCustom && !isAppt && !isDone && (
-                    <View className="flex-row gap-1.5">
-                      <Pressable hitSlop={6} onPress={() => onPauseTask(task)} className="w-8 h-8 rounded-full bg-white border border-line items-center justify-center"><Ionicons name="pause-outline" size={15} color="#64748B" /></Pressable>
-                      <Pressable hitSlop={6} onPress={() => onDeleteTask(task)} className="w-8 h-8 rounded-full bg-white border border-line items-center justify-center"><Ionicons name="trash-outline" size={14} color="#64748B" /></Pressable>
-                    </View>
-                  )}
-                  {isAppt ? (
-                    <View className="bg-blue-soft px-2.5 py-1.5 rounded-full">
-                      <Text maxFontSizeMultiplier={1.1} className="text-[11px] font-bold text-blue">{task.apptStatus || 'Confirmed'}</Text>
-                    </View>
-                  ) : isDone ? (
-                    <View className="w-9 h-9 rounded-full bg-green-soft items-center justify-center"><Ionicons name="checkmark" size={19} color={colors.green} /></View>
-                  ) : (
-                    <Pressable onPress={() => completeTask(task)} accessibilityRole="button" accessibilityLabel={`Mark ${task.title} complete`} className="w-9 h-9 rounded-full bg-primary items-center justify-center active:opacity-80">
-                      <Ionicons name="checkmark" size={20} color="#fff" />
-                    </Pressable>
-                  )}
-                </View>
                 </CompletableRow>
               );
             })}
           </ScrollView>
-          <AllDoneNote show={tasks.every((t) => t.status === 'completed')} />
-
-          {/* Bottom summary */}
-          <View className="flex-row gap-2 mt-3 pt-3.5 border-t border-orange-100">
-            {([
-              ['Next Task', nextTask?.time ?? '✓', 'calendar-outline', 'bg-purple-soft', colors.purple],
-              ['Total Tasks', String(actionable.length), 'time-outline', 'bg-primary-soft', colors.primary],
-              ['Completed', String(completed.length), 'checkmark-circle-outline', 'bg-green-soft', colors.green],
-            ] as const).map(([k, v, icon, box, fg]) => (
-              <View key={k} className="flex-1 flex-row items-center gap-1.5">
-                <View className={cn('w-8 h-8 rounded-full items-center justify-center', box)}><Ionicons name={icon} size={15} color={fg} /></View>
-                <View className="flex-1">
-                  <Text className="text-[9px] text-muted" numberOfLines={1}>{k}</Text>
-                  <Text className="text-xs font-bold text-ink" numberOfLines={1}>{v}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          <DoneNote show={tasks.every((t) => t.status === 'completed')} />
         </>
       )}
-    </Card>
+    </Panel>
   );
 }

@@ -3,11 +3,11 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, Tex
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { T, cn } from '../ui';
-import { CATEGORY_EMOJI, CONDITIONS, PET_CATEGORIES, PRODUCT_CATEGORIES } from '../../data/resell';
+import { CATEGORY_EMOJI, CONDITIONS, DISTANCE_OPTIONS, PET_CATEGORIES, PRODUCT_CATEGORIES } from '../../data/resell';
 
-export type Filters = { location: string; condition: string; min: string; max: string; category: string; type: 'All' | 'Pet' | 'Product' };
-export const noFilters: Filters = { location: '', condition: 'All', min: '', max: '', category: 'All', type: 'All' };
-export const activeFilterCount = (f: Filters) => [f.location.trim(), f.condition !== 'All', f.min, f.max, f.category !== 'All', f.type !== 'All'].filter(Boolean).length;
+export type Filters = { location: string; condition: string; min: string; max: string; category: string; type: 'All' | 'Pet' | 'Product'; distance: string };
+export const noFilters: Filters = { location: '', condition: 'All', min: '', max: '', category: 'All', type: 'All', distance: 'any' };
+export const activeFilterCount = (f: Filters) => [f.location.trim(), f.condition !== 'All', f.min, f.max, f.category !== 'All', f.type !== 'All', f.distance !== 'any'].filter(Boolean).length;
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -29,7 +29,7 @@ const Opt = ({ label, on, onPress }: { label: string; on: boolean; onPress: () =
   </Pressable>
 );
 
-export default function FilterSheet({ visible, value, onClose, onApply }: { visible: boolean; value: Filters; onClose: () => void; onApply: (f: Filters) => void }) {
+export default function FilterSheet({ visible, value, onClose, onApply, hasViewer, viewerLabel }: { visible: boolean; value: Filters; onClose: () => void; onApply: (f: Filters) => void; hasViewer: boolean; viewerLabel?: string }) {
   const [f, setF] = useState<Filters>(value);
   useEffect(() => { if (visible) setF(value); }, [visible]);
   const set = (p: Partial<Filters>) => setF((x) => ({ ...x, ...p }));
@@ -84,6 +84,17 @@ export default function FilterSheet({ visible, value, onClose, onApply }: { visi
                       <TextInput className="flex-1 py-3.5 text-[15px] text-ink" placeholder={k === 'min' ? 'Min' : 'Max'} placeholderTextColor={colors.muted} keyboardType="number-pad" value={f[k]} onChangeText={(v) => set({ [k]: v.replace(/\D/g, '') } as Partial<Filters>)} />
                     </View>
                   </React.Fragment>
+                ))}
+              </View>
+            </Section>
+
+            <Section icon="navigate" title="Distance">
+              <Text className="text-xs text-muted -mt-1">{hasViewer ? `From ${viewerLabel || 'your location'}` : 'Turn on location access to filter by distance'}</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {DISTANCE_OPTIONS.map((o) => (
+                  <View key={o.value} style={!hasViewer && o.value !== 'any' ? { opacity: 0.45 } : undefined} pointerEvents={!hasViewer && o.value !== 'any' ? 'none' : 'auto'}>
+                    <Opt label={o.label} on={f.distance === o.value} onPress={() => set({ distance: o.value })} />
+                  </View>
                 ))}
               </View>
             </Section>

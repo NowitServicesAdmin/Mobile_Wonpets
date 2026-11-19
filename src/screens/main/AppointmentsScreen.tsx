@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Empty, Gradient, T, Tone, cn } from '../../components/ui';
 import AppointmentCard, { DateTile, MODE_ICON, STATUS_META, formatApptDate } from '../../components/appointments/AppointmentCard';
 import AppointmentCalendar from '../../components/appointments/AppointmentCalendar';
 import RescheduleSheet from '../../components/appointments/RescheduleSheet';
+import SearchBar from '../../components/common/SearchBar';
+import FilterChips from '../../components/common/FilterChips';
+import { PageHeader } from '../../components/doctor/DoctorUI';
 import { toast } from '../../components/WonPetsAlert';
 import { Appointment } from '../../data/mock';
 import { usePets } from '../../context/PetsContext';
@@ -13,7 +16,7 @@ import { timeToMinutes } from '../../utils/schedule';
 import LoadMoreFooter from '../../components/LoadMoreFooter';
 import { AppointmentListSkeleton } from '../../components/Skeletons';
 
-const PAGE_SIZE = 6; // appointments revealed per scroll batch
+const PAGE_SIZE = 8; // appointments revealed per scroll batch
 
 const statuses: Appointment['status'][] = ['Pending', 'Confirmed', 'In Progress', 'Completed', 'Cancelled'];
 export const statusTone: Record<string, Tone> = { Pending: 'yellow', Confirmed: 'blue', 'In Progress': 'orange', Completed: 'green', Cancelled: 'red' };
@@ -24,6 +27,24 @@ const sortKey = (a: Appointment) => {
   return (a.isoDate ?? `${new Date().getFullYear()}-${mm}-${dd}`) + String(timeToMinutes(a.time)).padStart(4, '0');
 };
 const isJoinable = (a: Appointment) => a.mode === 'Online' && (a.status === 'Confirmed' || a.status === 'In Progress');
+
+/** List | Calendar switch as two icon buttons (lives in the page header, so it no longer needs its own row). */
+function ViewToggle({ view, onChange }: { view: 'list' | 'calendar'; onChange: (v: 'list' | 'calendar') => void }) {
+  return (
+    <View className="flex-row bg-orange-100/60 rounded-xl p-0.5">
+      {([['list', 'list-outline', 'List view'], ['calendar', 'calendar-outline', 'Calendar view']] as const).map(([k, icon, label]) => {
+        const on = view === k;
+        return (
+          <Pressable key={k} onPress={() => onChange(k)} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={label}
+            style={on ? { backgroundColor: '#fff', elevation: 2, shadowColor: '#7C2D12', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } } : undefined}
+            className="w-10 h-9 rounded-[10px] items-center justify-center">
+            <Ionicons name={icon} size={18} color={on ? colors.primary : colors.muted} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function AppointmentsScreen({ navigation }: any) {
   const { appointments, rescheduleAppointment, refreshAppointments, loaded } = usePets();
@@ -61,12 +82,13 @@ export default function AppointmentsScreen({ navigation }: any) {
   }, [appointments]);
   const filtered = !!q || active.length > 0 || !latestFirst;
   const join = (a: Appointment) => navigation.navigate('VideoCall', { id: a.id });
+  const resetFilters = () => { setActive([]); setQ(''); setLatestFirst(true); };
 
   return (
     <View className="flex-1 bg-cream">
       <FlatList
         className="flex-1"
-        contentContainerClassName="p-4 gap-3 pb-28"
+        contentContainerClassName="p-3.5 gap-2.5 pb-24"
         data={view === 'list' && loaded ? pageItems : []}
         refreshing={refreshing}
         onRefresh={async () => { setRefreshing(true); await refreshAppointments(); setRefreshing(false); }}
@@ -74,110 +96,71 @@ export default function AppointmentsScreen({ navigation }: any) {
         onEndReached={view === 'list' ? loadMore : undefined}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
-          <View className="gap-4 mb-1">
-            <View>
-              <Text className="text-primary font-extrabold text-xs uppercase tracking-widest">WONPET Health Center</Text>
-              <Text className="text-[28px] font-black text-ink">Appointments</Text>
-            </View>
+          <View className="gap-2.5 mb-0.5">
+            <PageHeader icon="calendar" title="Appointments" subtitle="WONPET Health Center" right={<ViewToggle view={view} onChange={setView} />} />
 
-            {/* next up hero */}
+            {/* next up: one slim row; the video-consult button is a round icon instead of a full-width bar */}
             {loaded && (next ? (
-              <Gradient className="rounded-3xl p-4 overflow-hidden" colorsArr={['#FF6B00', '#F59E0B']}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="flex-row items-center gap-1.5 bg-white/25 rounded-full px-2.5 py-1"><Ionicons name="flash" size={12} color="#fff" /><Text className="text-white text-[11px] font-extrabold uppercase tracking-wider">Next up</Text></View>
-                  <View className="flex-row items-center gap-1"><Ionicons name={MODE_ICON[next.mode] ?? 'medical-outline'} size={14} color="#fff" /><Text className="text-white text-xs font-bold">{next.mode}</Text></View>
-                </View>
-                <Pressable onPress={() => navigation.navigate('AppointmentDetail', { id: next.id })} className="flex-row items-center gap-3.5 active:opacity-90">
-                  <View className="bg-white rounded-2xl"><DateTile a={next} size={58} /></View>
+              <Gradient className="rounded-3xl p-3 overflow-hidden" colorsArr={['#FF6B00', '#F59E0B']}>
+                <Pressable onPress={() => navigation.navigate('AppointmentDetail', { id: next.id })} accessibilityRole="button" accessibilityLabel={`Next appointment: ${next.pet}, ${formatApptDate(next)} at ${next.time}`} className="flex-row items-center gap-3 active:opacity-90">
+                  <View className="bg-white rounded-2xl"><DateTile a={next} size={50} /></View>
                   <View className="flex-1">
-                    <Text className="text-white text-xl font-black" numberOfLines={1}>{next.pet}</Text>
-                    <Text className="text-white/95 font-semibold" numberOfLines={1}>{formatApptDate(next)} · {next.time}</Text>
-                    <Text className="text-white/85 text-xs mt-0.5" numberOfLines={1}>{next.doctor ?? 'Doctor to be assigned'}</Text>
+                    <View className="flex-row items-center gap-1.5">
+                      <Ionicons name="flash" size={11} color="#fff" />
+                      <Text className="text-white text-[10px] font-extrabold uppercase tracking-wider">Next up</Text>
+                      <Text className="text-white/70 text-[10px]">•</Text>
+                      <Ionicons name={MODE_ICON[next.mode] ?? 'medical-outline'} size={12} color="#fff" />
+                      <Text className="text-white text-[11px] font-bold" numberOfLines={1}>{next.mode}</Text>
+                    </View>
+                    <Text className="text-white text-[18px] font-black leading-6" numberOfLines={1}>{next.pet}</Text>
+                    <Text className="text-white/95 text-[12.5px] font-semibold" numberOfLines={1}>{formatApptDate(next)} · {next.time}</Text>
+                    <Text className="text-white/85 text-[11px]" numberOfLines={1}>{next.doctor ?? 'Doctor to be assigned'}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#fff" />
+                  {isJoinable(next)
+                    ? <Pressable hitSlop={6} onPress={() => join(next)} accessibilityRole="button" accessibilityLabel="Join video consult" className="w-11 h-11 rounded-full bg-white items-center justify-center active:opacity-90"><Ionicons name="videocam" size={20} color={colors.primary} /></Pressable>
+                    : <Ionicons name="chevron-forward" size={20} color="#fff" />}
                 </Pressable>
-                {isJoinable(next) && (
-                  <Pressable onPress={() => join(next)} className="mt-3.5 bg-white rounded-xl py-2.5 flex-row items-center justify-center gap-1.5 active:opacity-90">
-                    <Ionicons name="videocam" size={16} color={colors.primary} /><Text className="text-primary font-extrabold">Join video consult</Text>
-                  </Pressable>
-                )}
               </Gradient>
             ) : (
-              <View className="bg-white border border-line rounded-3xl p-4 flex-row items-center gap-3">
-                <View className="w-12 h-12 rounded-2xl bg-primary-soft items-center justify-center"><Ionicons name="calendar-outline" size={24} color={colors.primary} /></View>
+              <View className="bg-white border border-line rounded-3xl p-3 flex-row items-center gap-3">
+                <View className="w-10 h-10 rounded-2xl bg-primary-soft items-center justify-center"><Ionicons name="calendar-outline" size={20} color={colors.primary} /></View>
                 <View className="flex-1"><Text className={T.h3}>No upcoming visits</Text><Text className={T.small}>Book a vet visit and it will show up here.</Text></View>
               </View>
             ))}
 
-            {/* stats */}
-            <View className="flex-row gap-2">
-              {stats.map(([label, n, c, icon]) => (
-                <View key={label} className="flex-1 bg-white border border-line rounded-2xl py-2.5 items-center">
-                  <Ionicons name={icon} size={15} color={c} />
-                  <Text className="text-[20px] font-black text-ink leading-6">{n}</Text>
-                  <Text className="text-[10px] font-semibold text-muted">{label}</Text>
+            {/* stats: one strip with dividers instead of four separate tiles */}
+            <View className="flex-row bg-white border border-line rounded-2xl py-2">
+              {stats.map(([label, n, c, icon], i) => (
+                <View key={label} className={cn('flex-1 items-center', i > 0 && 'border-l border-line')}>
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons name={icon} size={13} color={c} />
+                    <Text maxFontSizeMultiplier={1.1} className="text-[17px] font-black text-ink leading-6">{n}</Text>
+                  </View>
+                  <Text maxFontSizeMultiplier={1.1} className="text-[10px] font-semibold text-muted" numberOfLines={1}>{label}</Text>
                 </View>
               ))}
             </View>
 
-            {/* search + sort */}
-            <View className="flex-row gap-2">
-              <View className="flex-1 flex-row items-center gap-2 bg-white border border-line rounded-2xl px-3">
-                <Ionicons name="search-outline" size={18} color={colors.muted} />
-                <TextInput value={q} onChangeText={setQ} placeholder="Search by pet name…" placeholderTextColor="#B8AEA5" className="flex-1 py-3 text-ink" />
-                {!!q && <Pressable onPress={() => setQ('')} hitSlop={8}><Ionicons name="close-circle" size={18} color="#CDBFB0" /></Pressable>}
+            {/* search + sort in one row, status chips (with counts) in the next */}
+            <SearchBar value={q} onChangeText={setQ} placeholder="Search by pet name…"
+              trailing={{ icon: latestFirst ? 'arrow-down' : 'arrow-up', label: latestFirst ? 'Sorted latest first' : 'Sorted oldest first', onPress: () => setLatestFirst((v) => !v) }} />
+            <FilterChips allCount={appointments.length} active={active} onChange={setActive}
+              options={statuses.map((s) => ({ key: s, label: s, count: count(s), color: STATUS_META[s].color, soft: STATUS_META[s].soft }))} />
+
+            {/* only shown while something is filtered; otherwise the chips already say how many there are */}
+            {filtered && view === 'list' && (
+              <View className="flex-row justify-between items-center">
+                <Text className={T.small}>{list.length} appointment{list.length === 1 ? '' : 's'}</Text>
+                <Pressable onPress={resetFilters} accessibilityRole="button"><Text className="text-primary font-bold text-[13px]">Reset filters</Text></Pressable>
               </View>
-              <Pressable onPress={() => setLatestFirst((v) => !v)} accessibilityLabel={latestFirst ? 'Sorted latest first' : 'Sorted oldest first'} className="w-12 rounded-2xl bg-white border border-line items-center justify-center active:bg-primary-soft">
-                <Ionicons name={latestFirst ? 'arrow-down' : 'arrow-up'} size={18} color={colors.primary} />
-              </Pressable>
-            </View>
-
-            {/* list / calendar */}
-<View className="flex-row bg-orange-100/60 rounded-2xl p-1">
-  {([['list', 'list-outline', 'List'], ['calendar', 'calendar-outline', 'Calendar']] as const).map(([k, icon, label]) => {
-    const on = view === k;
-    return (
-      <Pressable
-        key={k}
-        onPress={() => setView(k)}
-        style={on ? { backgroundColor: '#fff', elevation: 2, shadowColor: '#7C2D12', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } } : undefined}
-        className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl"
-      >
-        <Ionicons name={icon} size={16} color={on ? colors.primary : colors.muted} />
-        <Text style={{ color: on ? colors.primary : colors.muted }} className="font-bold">{label}</Text>
-      </Pressable>
-    );
-  })}
-</View>
-
-            {/* status filters */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pr-4">
-              <Pressable onPress={() => setActive([])} className={cn('px-3.5 py-2 rounded-full border', !active.length ? 'bg-ink border-ink' : 'bg-white border-line')}>
-                <Text className={cn('font-bold text-[13px]', !active.length ? 'text-white' : 'text-ink')}>All · {appointments.length}</Text>
-              </Pressable>
-              {statuses.map((st) => {
-                const on = active.includes(st); const m = STATUS_META[st];
-                return (
-                  <Pressable key={st} onPress={() => setActive((a) => (a.includes(st) ? a.filter((x) => x !== st) : [...a, st]))}
-                    style={on ? { backgroundColor: m.soft, borderColor: m.color } : undefined}
-                    className={cn('flex-row items-center gap-1.5 px-3 py-2 rounded-full border', !on && 'bg-white border-line')}>
-                    <View style={{ backgroundColor: m.color }} className="w-2 h-2 rounded-full" />
-                    <Text style={on ? { color: m.color } : undefined} className={cn('font-bold text-[13px]', !on && 'text-ink')}>{st} · {count(st)}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <View className="flex-row justify-between items-center">
-              <Text className={T.small}>{view === 'list' ? `${list.length} appointment${list.length === 1 ? '' : 's'}` : 'Tap a day to see its visits'}</Text>
-              {filtered && <Pressable onPress={() => { setActive([]); setQ(''); setLatestFirst(true); }}><Text className="text-primary font-bold text-[13px]">Reset filters</Text></Pressable>}
-            </View>
-            {view === 'calendar' && <AppointmentCalendar appointments={list} onOpen={(a) => navigation.navigate('AppointmentDetail', { id: a.id })} />}
+            )}
+            {view === 'calendar' && <AppointmentCalendar compact appointments={appointments} onOpen={(a) => navigation.navigate('AppointmentDetail', { id: a.id })} />}
           </View>
         }
         ListEmptyComponent={!loaded ? <AppointmentListSkeleton /> : view === 'list' ? <Empty emoji="🩺" title="No appointments" body={appointments.length ? 'Nothing matches these filters.' : 'Book your first visit to see it here.'} /> : undefined}
         renderItem={({ item }) => (
           <AppointmentCard
+            compact
             item={item}
             onOpen={() => navigation.navigate('AppointmentDetail', { id: item.id })}
             onJoin={isJoinable(item) ? () => join(item) : undefined}

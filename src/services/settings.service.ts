@@ -95,8 +95,10 @@ export const settingsService = {
   },
 
   /* ------------------------------- subscription ------------------------------- */
-  async getPlans(): Promise<{ plans: Plan[]; yearlySaving?: number }> {
-    const { data } = await api.get('/subscriptions/plans', { params: { role: 'customer' } });
+  /** Plans are managed per role on the server (PlanGroup): owners see the customer plans, doctors and store managers see their own. */
+  async getPlans(role: string = 'user'): Promise<{ plans: Plan[]; yearlySaving?: number }> {
+    const planRole = role === 'doctor' ? 'doctor' : role === 'store manager' ? 'store manager' : 'customer';
+    const { data } = await api.get('/subscriptions/plans', { params: { role: planRole } });
     return {
       yearlySaving: data.yearlySaving,
       plans: (data.plans || []).map((p: any): Plan => ({
@@ -105,11 +107,16 @@ export const settingsService = {
       })),
     };
   },
-  async getMySubscription(): Promise<(Subscription & { active: boolean }) | null> {
+  /** `current` is only a plan that is still running (status active AND end date in the future) - an ended plan is never "current".
+   *  `expired` carries the last paid plan that has ended so the screen can say so. Both null = never subscribed / on the free plan. */
+  async getMySubscriptionState(): Promise<{ current: (Subscription & { active: boolean }) | null; expired: { planId: string; endedOn: string } | null }> {
     const { data } = await api.get('/subscriptions/me');
     const s = data.subscription;
-    if (!s || s.status !== 'active') return null;
-    return { planId: s.planName, billing: s.billingCycle === 'yearly' ? 'yearly' : 'monthly', renewsOn: isoDay(s.endDate), cancelled: !!s.cancelRequested, active: !!s.isCurrentlyActive };
+    if (!s) return { current: null, expired: null };
+    const live = s.status === 'active' && (s.isCurrentlyActive ?? (!!s.endDate && new Date(s.endDate).getTime() > Date.now()));
+    if (live) return { current: { planId: s.planName, billing: s.billingCycle === 'yearly' ? 'yearly' : 'monthly', renewsOn: isoDay(s.endDate), cancelled: !!s.cancelRequested, active: true }, expired: null };
+    const endedPaid = (s.status === 'expired' || s.status === 'active') && s.planName && s.planName !== 'basic';
+    return { current: null, expired: endedPaid ? { planId: s.planName, endedOn: isoDay(s.endDate) } : null };
   },
   async cancelSubscription(reason = '') {
     await api.patch('/subscriptions/cancel', { reason });
@@ -117,7 +124,7 @@ export const settingsService = {
   async restoreSubscription() {
     await api.patch('/subscriptions/restore');
   },
-  /** Step 1 of buying a paid plan. Ready for when the Razorpay checkout is switched on (then call activateSubscription). */
+  /** Step 1 of buying a paid plan: creates the Razorpay order. Then payWithRazorpay -> activateSubscription (done by SettingsContext.buyPlan). */
   async initiateSubscription(planName: string, billingCycle: 'monthly' | 'yearly') {
     const { data } = await api.post('/subscriptions/initiate', { planName, billingCycle });
     return data as { requiresPayment: boolean; order?: { id: string; amount: number }; keyId?: string };

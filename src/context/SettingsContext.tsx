@@ -3,6 +3,7 @@ import { AdditionalInfo, Collaborator, Invitation, NotificationPrefs, Plan, Sett
 import { plans as fallbackPlans } from '../data/mock';
 import { settingsService } from '../services/settings.service';
 import { useAuth } from './AuthContext';
+import { payWithRazorpay } from '../utils/razorpay';
 
 type Doc = SettingsDoc & { id?: string };
 type Ctx = {
@@ -14,8 +15,12 @@ type Ctx = {
   yearlySaving: number;
   /** null = on the free plan */
   subscription: Subscription | null;
+  /** Last paid plan that has ended (while on the free plan again); null otherwise. */
+  expiredPlan: { planId: string; endedOn: string } | null;
   cancelPlan: () => Promise<void>;
   restorePlan: () => Promise<void>;
+  /** Paid plan purchase: server creates the Razorpay order -> checkout sheet -> server verifies the signature and activates. Throws PaymentCancelled if the sheet is closed. */
+  buyPlan: (plan: Plan, billing: 'monthly' | 'yearly') => Promise<void>;
   info: AdditionalInfo;
   /** True once the Additional Information answer (or failure) has arrived - lets the header / form show a skeleton first. */
   infoLoaded: boolean;
@@ -48,6 +53,7 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
   const [plans, setPlans] = useState<Plan[]>(localPlans);
   const [yearlySaving, setYearlySaving] = useState(DEFAULT_YEARLY_SAVING);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [expiredPlan, setExpiredPlan] = useState<Ctx['expiredPlan']>(null);
   const [info, setInfo] = useState<AdditionalInfo>(emptyInfo);
   const [infoLoaded, setInfoLoaded] = useState(false);
   const [ready, setReady] = useState(false);
@@ -62,9 +68,12 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
     // only pet owners have collaborators / plans of their own; the server answers 403 to doctors & store managers
     // (guards the brief moment the owner tree is mounted while a doctor's session is still being restored)
     const owner = scope === 'owner' && user?.role === 'user';
+    // plans + subscription apply to every role (the server keeps a separate plan list per role)
+    const role = user?.role ?? 'user';
     await Promise.all([
-      owner && settingsService.getPlans().then((r) => { if (r.plans.length) setPlans(r.plans); if (r.yearlySaving != null) setYearlySaving(r.yearlySaving); }).catch(() => {}),
-      owner && settingsService.getMySubscription().then(setSubscription).catch(() => {}),
+      settingsService.getPlans(role).then((r) => { if (r.plans.length) setPlans(r.plans); else if (!owner) setPlans([]); if (r.yearlySaving != null) setYearlySaving(r.yearlySaving); })
+        .catch(() => { if (!owner) setPlans([]); }), // never show the owner's fallback plans to a doctor / store manager
+      settingsService.getMySubscriptionState().then((s) => { setSubscription(s.current); setExpiredPlan(s.expired); }).catch(() => {}),
       settingsService.getInfo().then(setInfo).catch(() => {}).finally(() => setInfoLoaded(true)),
       settingsService.getPrefs().then(setPrefs).catch(() => {}),
       settingsService.getDocuments().then(setDocuments).catch(() => {}),
@@ -78,7 +87,7 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
 
   useEffect(() => {
     if (user?.id) reload();
-    else { setSubscription(null); setInfo(emptyInfo); setInfoLoaded(false); setReady(false); setDocuments({}); setPrefs(defaultPrefs()); setCollaborators([]); setInvitations([]); }
+    else { setSubscription(null); setExpiredPlan(null); setInfo(emptyInfo); setInfoLoaded(false); setReady(false); setDocuments({}); setPrefs(defaultPrefs()); setCollaborators([]); setInvitations([]); }
   }, [user?.id, reload]);
 
   const refreshCollabs = async () => {
@@ -86,13 +95,29 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
     setCollaborators(await settingsService.listCollaborators());
   };
   const refreshInvites = async () => setInvitations(await settingsService.listInvitations());
-  const refreshSub = async () => setSubscription(await settingsService.getMySubscription());
+  const refreshSub = async () => { const s = await settingsService.getMySubscriptionState(); setSubscription(s.current); setExpiredPlan(s.expired); };
 
   return (
     <SettingsContext.Provider value={{
-      loading, ready, reload, plans, yearlySaving, subscription,
+      loading, ready, reload, plans, yearlySaving, subscription, expiredPlan,
       cancelPlan: async () => { await settingsService.cancelSubscription(); await refreshSub(); },
       restorePlan: async () => { await settingsService.restoreSubscription(); await refreshSub(); },
+      buyPlan: async (plan, billing) => {
+        const init = await settingsService.initiateSubscription(plan.id, billing);
+        if (init.requiresPayment) {
+          if (!init.order || !init.keyId) throw new Error('Could not start the payment. Please try again.');
+          const paid = await payWithRazorpay({
+            keyId: init.keyId,
+            orderId: init.order.id,
+            amountPaise: init.order.amount,
+            title: 'WON PET PRO',
+            description: `${plan.name} - ${billing} plan`,
+            prefill: { name: user?.name, email: user?.email, contact: user?.phone },
+          });
+          await settingsService.activateSubscription(paid);
+        }
+        await refreshSub();
+      },
       info, infoLoaded, saveInfo: async (i) => setInfo(await settingsService.saveInfo(i)),
       documents,
       uploadDocument: async (type, file) => {

@@ -11,6 +11,7 @@ import { useRemote } from '../../hooks/useRemote';
 import { smService } from '../../services/storeManager.service';
 import { useStoreManager } from '../../context/StoreManagerContext';
 import { useSettings } from '../../context/SettingsContext';
+import PlanEndedBanner from '../../components/settings/PlanEndedBanner';
 import { useAuth } from '../../context/AuthContext';
 
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -114,6 +115,8 @@ export default function SMDashboardScreen({ navigation }: any) {
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 gap-4 pb-10"
       refreshControl={<RefreshControl refreshing={dash.refreshing} onRefresh={dash.reload} tintColor={colors.primary} />}>
+
+      <PlanEndedBanner onRenew={() => navigation.navigate('SMProfile', { open: 'subscription', at: Date.now() })} />
 
       {/* only while something is still missing */}
       {todo.length > 0 && (

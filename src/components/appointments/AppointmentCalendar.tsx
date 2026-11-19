@@ -23,11 +23,14 @@ export const isoOf = (a: Appointment) => {
   return `${new Date().getFullYear()}-${mm}-${dd}`;
 };
 
-export default function AppointmentCalendar({ appointments, onOpen, viewer = 'owner' }: { appointments: Appointment[]; onOpen: (a: Appointment) => void; viewer?: 'owner' | 'doctor' }) {
+export default function AppointmentCalendar({ appointments, onOpen, viewer = 'owner', compact = false }: { appointments: Appointment[]; onOpen: (a: Appointment) => void; viewer?: 'owner' | 'doctor'; compact?: boolean }) {
+  const cellH = compact ? 42 : 50;
+  const circle = compact ? 'w-[36px] h-[38px]' : 'w-[40px] h-[44px]';
   const today = new Date();
   const todayKey = keyOf(today);
   const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<string>(todayKey);
+  const [displayMode, setDisplayMode] = useState<'month' | 'day'>('day');
 
   const byDate = useMemo(() => {
     const m: Record<string, Appointment[]> = {};
@@ -41,37 +44,87 @@ export default function AppointmentCalendar({ appointments, onOpen, viewer = 'ow
   const cells: (number | null)[] = [...Array(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
   const isThisMonth = month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth();
-  const shift = (n: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
-  const dayList = byDate[selected] ?? [];
+  const shift = (n: number) => {
+  setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
+  setDisplayMode('month');
+};
+
+const dayList = byDate[selected] ?? [];
+
+const monthAppointments = Object.entries(byDate)
+  .filter(([date]) => date.startsWith(
+    `${month.getFullYear()}-${pad(month.getMonth() + 1)}`
+  ))
+  .flatMap(([, list]) => list)
+  .sort((a, b) => {
+    const dateCompare = isoOf(a).localeCompare(isoOf(b));
+    if (dateCompare !== 0) return dateCompare;
+    return (a.time24 ?? '').localeCompare(b.time24 ?? '');
+  });
+
+const visibleAppointments =
+  displayMode === 'month' ? monthAppointments : dayList;
   const monthCount = Object.keys(byDate).filter((k) => k.startsWith(`${month.getFullYear()}-${pad(month.getMonth() + 1)}`)).reduce((n, k) => n + byDate[k].length, 0);
 
   return (
-    <View className="gap-3.5">
-      <Card>
+    <View className={compact ? 'gap-2.5' : 'gap-3.5'}>
+      <Card className={compact ? 'p-3' : undefined}>
         <View className="flex-row items-center justify-between mb-3">
           <Pressable onPress={() => shift(-1)} hitSlop={8} className="w-9 h-9 rounded-xl border border-orange-200 bg-white items-center justify-center"><Ionicons name="chevron-back" size={18} color={colors.text} /></Pressable>
-          <View className="items-center">
-            <Text className="text-base font-extrabold text-ink">{month.toLocaleString('en-US', { month: 'long', year: 'numeric' })}</Text>
-            {!isThisMonth
-              ? <Pressable onPress={() => { setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(todayKey); }}><Text className="text-xs font-bold text-primary mt-0.5">Jump to today</Text></Pressable>
-              : <Text className={T.small}>{monthCount} appointment{monthCount === 1 ? '' : 's'} this month</Text>}
-          </View>
+          
+<View className="items-center">
+  <Text className="text-base font-extrabold text-ink">
+    {month.toLocaleString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    })}
+  </Text>
+
+  {!isThisMonth ? (
+    <Pressable
+      onPress={() => {
+        setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+        setSelected(todayKey);
+        setDisplayMode('day');
+      }}
+      hitSlop={8}
+      className="mt-1 flex-row items-center gap-1.5 rounded-full bg-orange-50 border border-orange-100 px-3 py-1.5 self-center"
+    >
+      <Ionicons
+        name="calendar-outline"
+        size={13}
+        color={colors.primary}
+      />
+      <Text
+        numberOfLines={1}
+        className="text-[11px] font-bold text-primary"
+      >
+        Today
+      </Text>
+    </Pressable>
+  ) : (
+    <Text className={cn(T.small, 'mt-1')}>
+      {monthCount} appointment{monthCount === 1 ? '' : 's'} this month
+    </Text>
+  )}
+</View>
+
           <Pressable onPress={() => shift(1)} hitSlop={8} className="w-9 h-9 rounded-xl border border-orange-200 bg-white items-center justify-center"><Ionicons name="chevron-forward" size={18} color={colors.text} /></Pressable>
         </View>
 
         <View className="flex-row mb-1">{WEEKDAYS.map((d, i) => <Text key={i} className="flex-1 text-center text-[11px] font-bold text-muted py-1">{d}</Text>)}</View>
         <View className="flex-row flex-wrap">
           {cells.map((d, i) => {
-            if (!d) return <View key={`e${i}`} style={{ width: '14.2857%', height: 50 }} />;
+            if (!d) return <View key={`e${i}`} style={{ width: '14.2857%', height: cellH }} />;
             const key = `${month.getFullYear()}-${pad(month.getMonth() + 1)}-${pad(d)}`;
             const list = byDate[key] ?? [];
             const isToday = key === todayKey;
             const isSel = key === selected;
             const statuses = [...new Set(list.map((a) => a.status))].slice(0, 3);
             return (
-              <View key={key} style={{ width: '14.2857%', height: 50 }} className="items-center justify-center">
-                <Pressable onPress={() => setSelected(key)}
-  className={cn('w-[40px] h-[44px] rounded-full items-center justify-center', isSel ? 'bg-primary' : isToday ? 'bg-primary-soft border border-primary' : list.length ? 'bg-cream' : '')}>
+              <View key={key} style={{ width: '14.2857%', height: cellH }} className="items-center justify-center">
+                <Pressable onPress={() => { setSelected(key); setDisplayMode('day');}}
+  className={cn(circle, 'rounded-full items-center justify-center', isSel ? 'bg-primary' : isToday ? 'bg-primary-soft border border-primary' : list.length ? 'bg-cream' : '')}>
   <Text className={cn('text-[14px] font-bold', isSel ? 'text-white' : isToday ? 'text-primary' : 'text-ink')}>{d}</Text>
   {!!statuses.length && (
     <View className="flex-row gap-0.5 mt-0.5">
@@ -85,26 +138,105 @@ export default function AppointmentCalendar({ appointments, onOpen, viewer = 'ow
           })}
         </View>
 
-        <View className="flex-row flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-orange-100">
+        <View className={cn('flex-row flex-wrap gap-x-3 gap-y-1 border-t border-orange-100', compact ? 'mt-2 pt-2' : 'mt-3 pt-3')}>
           {Object.entries(STATUS_COLOR).map(([s, c]) => <View key={s} className="flex-row items-center gap-1"><View style={{ backgroundColor: c }} className="w-2 h-2 rounded-full" /><Text className="text-[11px] text-muted">{s}</Text></View>)}
         </View>
       </Card>
 
-      <Text className={T.h3}>{selected === todayKey ? 'Today' : new Date(selected + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}</Text>
-      {!dayList.length && (
-        <View className="items-center bg-white rounded-2xl border border-line py-7 gap-1"><Ionicons name="calendar-clear-outline" size={30} color="#D8C7B5" /><Text className={T.small}>No appointments on this day</Text></View>
-      )}
-      {dayList.map((a) => (
-  <Pressable key={a.id} onPress={() => onOpen(a)} className="flex-row items-center gap-3 bg-white rounded-2xl border border-line p-3 active:bg-cream" style={{ borderLeftWidth: 4, borderLeftColor: STATUS_COLOR[a.status] ?? '#94A3B8' }}>
-    <PetAvatar emoji={a.emoji} image={a.petImage} size={46} />
+     
+<View className="flex-row items-center justify-between">
+  <View className="flex-1">
+    <Text className={T.h3}>
+      {displayMode === 'month'
+        ? month.toLocaleString('en-US', {
+            month: 'long',
+            year: 'numeric',
+          }) + ' Appointments'
+        : selected === todayKey
+          ? 'Today'
+          : new Date(selected + 'T00:00:00').toLocaleDateString(
+              'en-IN',
+              {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'short',
+              }
+            )}
+    </Text>
+    <Text className={T.small}>
+      {visibleAppointments.length} appointment
+      {visibleAppointments.length !== 1 ? 's' : ''}
+    </Text>
+  </View>
+
+  {displayMode === 'day' && (
+    <Pressable onPress={() => setDisplayMode('month')}>
+      <Text className="text-primary font-bold text-xs">
+        View month
+      </Text>
+    </Pressable>
+  )}
+</View>
+
+{!visibleAppointments.length && (
+  <View className="items-center bg-white rounded-2xl border border-line py-7 gap-1">
+    <Ionicons name="calendar-clear-outline" size={30} color="#D8C7B5" />
+    <Text className={T.small}>
+      {displayMode === 'month'
+        ? 'No appointments this month'
+        : 'No appointments on this day'}
+    </Text>
+  </View>
+)}
+
+{visibleAppointments.map((a) => (
+  <Pressable
+    key={a.id}
+    onPress={() => onOpen(a)}
+    className={cn('flex-row items-center gap-3 bg-white rounded-2xl border border-line active:bg-cream', compact ? 'p-2.5' : 'p-3')}
+    style={{
+      borderLeftWidth: 4,
+      borderLeftColor: STATUS_COLOR[a.status] ?? '#94A3B8',
+    }}
+  >
+    <PetAvatar emoji={a.emoji} image={a.petImage} size={compact ? 38 : 46} />
+
     <View className="flex-1 gap-1">
-      <View className="flex-row items-center justify-between"><Text className={T.h3} numberOfLines={1}>{a.pet}</Text><Text className="text-xs font-extrabold text-primary">{a.time}</Text></View>
-      <View className="flex-row items-center gap-1.5"><Avatar image={viewer === 'doctor' ? a.ownerImage : a.doctorImage} emoji={viewer === 'doctor' ? '🙂' : '🩺'} size={18} /><Text className={cn(T.small, 'flex-1')} numberOfLines={1}>{viewer === 'doctor' ? (a.owner ?? 'Pet owner') : (a.doctor ?? 'Doctor')} · {a.mode}</Text></View>
-      <StatusPill status={a.status} />
+      {displayMode === 'month' && (
+        <Text className="text-[11px] font-bold text-primary">
+          {new Date(isoOf(a) + 'T00:00:00').toLocaleDateString(
+            'en-IN',
+            { day: 'numeric', month: 'short' }
+          )}
+        </Text>
+      )}
+
+      <View className="flex-row items-center justify-between">
+        <Text className={T.h3} numberOfLines={1}>{a.pet}</Text>
+        <Text className="text-xs font-extrabold text-primary">{a.time}</Text>
+      </View>
+
+      <View className="flex-row items-center gap-1.5">
+        <Avatar
+          image={viewer === 'doctor' ? a.ownerImage : a.doctorImage}
+          emoji={viewer === 'doctor' ? '🙂' : '🩺'}
+          size={18}
+        />
+        <Text className={cn(T.small, 'flex-1')} numberOfLines={1}>
+          {viewer === 'doctor'
+            ? (a.owner ?? 'Pet owner')
+            : (a.doctor ?? 'Doctor')} · {a.mode}
+        </Text>
+        {compact && <StatusPill status={a.status} />}
+      </View>
+
+      {!compact && <StatusPill status={a.status} />}
     </View>
+
     <Ionicons name="chevron-forward" size={16} color={colors.muted} />
   </Pressable>
 ))}
+
     </View>
   );
 }

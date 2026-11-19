@@ -38,7 +38,7 @@ function resolveOwner(path?: string): SearchTarget | null {
   if (p === '/owner/notifications') return { name: 'Notifications' };
   if (p === '/owner/settings') {
     // web links like /owner/settings?tab=collaborators -> open that Profile section
-    const hint = (q.tab || q.section || q.open || q.view || '').toLowerCase();
+    const hint = (q.tab || q.section || q.open || q.view || q.focus || '').toLowerCase();
     const key = !hint ? null
       : hint.includes('shared') ? 'shared'
       : hint.includes('collab') ? 'collaborators'

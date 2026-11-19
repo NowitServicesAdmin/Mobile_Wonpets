@@ -36,22 +36,22 @@ export function PageHeader({ icon, title, subtitle, right }: { icon: IconName; t
 }
 
 /** White rounded card - the same look as the owner app's Card (rounded-3xl, soft cream-orange border). */
-export function Panel({ children, className }: { children?: React.ReactNode; className?: string }) {
-  return <View className={cn('bg-white rounded-3xl border border-line p-4', className)}>{children}</View>;
+export function Panel({ children, className, compact }: { children?: React.ReactNode; className?: string; compact?: boolean }) {
+  return <View className={cn('bg-white rounded-3xl border border-line', compact ? 'p-3.5' : 'p-4', className)}>{children}</View>;
 }
 
-/** Card header like the owner dashboard's SectionHeader: round tinted icon + title + caption, optional "View All" pill on the right. */
-export function PanelHeader({ icon, tone = 'orange', title, caption, action, onAction }: { icon?: IconName; tone?: DTone; title: string; caption?: string; action?: string; onAction?: () => void }) {
+/** Card header like the owner dashboard's SectionHeader: round tinted icon + title + caption, optional "View All" pill on the right. `compact` shrinks it so dense dashboards scroll less. */
+export function PanelHeader({ icon, tone = 'orange', title, caption, action, onAction, compact }: { icon?: IconName; tone?: DTone; title: string; caption?: string; action?: string; onAction?: () => void; compact?: boolean }) {
   const t = TONES[tone];
   return (
-    <View className="flex-row items-center gap-2.5 mb-3.5">
-      {!!icon && <View className={cn('w-10 h-10 rounded-full items-center justify-center', t.soft)}><Ionicons name={icon} size={18} color={t.fg} /></View>}
+    <View className={cn('flex-row items-center', compact ? 'gap-2 mb-2.5' : 'gap-2.5 mb-3.5')}>
+      {!!icon && <View className={cn('rounded-full items-center justify-center', compact ? 'w-8 h-8' : 'w-10 h-10', t.soft)}><Ionicons name={icon} size={compact ? 15 : 18} color={t.fg} /></View>}
       <View className="flex-1">
-        <Text className="text-[17px] font-extrabold text-ink" numberOfLines={1}>{title}</Text>
-        {!!caption && <Text className="text-xs text-muted" numberOfLines={1}>{caption}</Text>}
+        <Text maxFontSizeMultiplier={1.1} className={cn('font-extrabold text-ink', compact ? 'text-[15px]' : 'text-[17px]')} numberOfLines={1}>{title}</Text>
+        {!!caption && <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted" numberOfLines={1}>{caption}</Text>}
       </View>
       {!!action && (
-        <Pressable onPress={onAction} accessibilityRole="button" className="px-3 py-1.5 rounded-full bg-primary-soft active:opacity-70">
+        <Pressable onPress={onAction} accessibilityRole="button" className={cn('rounded-full bg-primary-soft active:opacity-70', compact ? 'px-2.5 py-1' : 'px-3 py-1.5')}>
           <Text className="text-xs font-bold text-primary">{action}</Text>
         </Pressable>
       )}
@@ -78,6 +78,28 @@ export function WebStatGrid({ stats }: { stats: WebStat[] }) {
           </>
         );
         const box = 'w-[48.4%] flex-row items-center gap-2 bg-white rounded-3xl border border-line px-3.5 py-3';
+        return s.onPress
+          ? <Pressable key={s.title} onPress={s.onPress} accessibilityRole="button" accessibilityLabel={`${s.title}: ${s.value}`} className={cn(box, 'active:bg-primary-soft')}>{body}</Pressable>
+          : <View key={s.title} className={box}>{body}</View>;
+      })}
+    </View>
+  );
+}
+
+/** Compact stat strip: every stat in one row (round icon, big number, short label). Replaces the two-row grid on dense screens. */
+export function CompactStatRow({ stats }: { stats: WebStat[] }) {
+  return (
+    <View className="flex-row gap-2">
+      {stats.map((s) => {
+        const t = TONES[s.tone];
+        const box = 'flex-1 items-center bg-white rounded-2xl border border-line py-2.5 px-1';
+        const body = (
+          <>
+            <View className={cn('w-8 h-8 rounded-full items-center justify-center', t.soft)}><Ionicons name={s.icon} size={15} color={t.fg} /></View>
+            <Text maxFontSizeMultiplier={1.1} className="text-[18px] font-black text-ink leading-6 mt-1" numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
+            <Text maxFontSizeMultiplier={1.1} className="text-[10px] font-semibold text-muted" numberOfLines={1}>{s.title}</Text>
+          </>
+        );
         return s.onPress
           ? <Pressable key={s.title} onPress={s.onPress} accessibilityRole="button" accessibilityLabel={`${s.title}: ${s.value}`} className={cn(box, 'active:bg-primary-soft')}>{body}</Pressable>
           : <View key={s.title} className={box}>{body}</View>;
