@@ -197,7 +197,7 @@ export function mapProduct(p: any): Product {
     off: disc > 0 ? Math.round(disc) : 0,
     rating: num(p.averageRating, 0),
     reviews: num(p.totalReviews, 0),
-    source: p.storeName || 'WonPets Store',
+    source: p.storeName || 'WonPetpro Store',
     stock: num(p.stock, 0),
     description: p.description || '',
     image: images[0],
@@ -206,6 +206,7 @@ export function mapProduct(p: any): Product {
     storeManagerId: idOf(p.storeManagerId) || undefined,
     breed: p.breed || undefined,
     badge: p.badge || undefined,
+    brand: (typeof p.brand === 'string' ? p.brand : p.brand?.name) || undefined,
   };
 }
 

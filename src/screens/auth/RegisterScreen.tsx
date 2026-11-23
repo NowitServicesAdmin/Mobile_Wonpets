@@ -1,38 +1,33 @@
 import React, { useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Button, Field, cn } from "../../components/ui";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { AUTH, AuthField, GradientButton } from "../../components/auth/AuthUI";
 import IdentifierField from "../../components/IdentifierField";
-import { colors } from "../../theme";
 import { COUNTRIES, parseIdentifier } from "../../utils/identifier";
 import { WonPetsAlert, toast } from "../../components/WonPetsAlert";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/auth.service";
-import { errorMessage } from "../../services/api";
-import { toApiGender, toApiRole } from "../../services/mappers";
+import { errorMessage, type ApiError } from "../../services/api";
+import { PENDING_DELETION, askToRestore } from "../../utils/restoreAccount";
+import { toApiRole } from "../../services/mappers";
 import AuthLayout from "./AuthLayout";
 
-type Gender = "male" | "female" | "other";
 type Role = "user" | "store_manager" | "doctor";
 
-const GENDERS: {
-  key: Gender;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-  { key: "male", label: "Male", icon: "male" },
-  { key: "female", label: "Female", icon: "female" },
-  { key: "other", label: "Others", icon: "transgender" },
+const ROLES: { key: Role; label: string; desc: string }[] = [
+  { key: "user", label: "Pet Owner", desc: "Manage and care for your pets" },
+  { key: "store_manager", label: "Store Manager", desc: "Manage your pet store and sales" },
+  { key: "doctor", label: "Doctor", desc: "Provide pet care and consultations" },
 ];
-const ROLES: {
-  key: Role;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-  { key: "user", label: "User", icon: "person" },
-  { key: "store_manager", label: "Store Manager", icon: "storefront" },
-  { key: "doctor", label: "Doctor", icon: "medkit" },
-];
+
+const roleIcon = (key: Role, color: string) =>
+  key === "user" ? (
+    <Ionicons name="person" size={30} color={color} />
+  ) : key === "store_manager" ? (
+    <MaterialCommunityIcons name="storefront-outline" size={30} color={color} />
+  ) : (
+    <MaterialCommunityIcons name="stethoscope" size={30} color={color} />
+  );
 
 export default function RegisterScreen({ navigation, route }: any) {
   const { startSession } = useAuth();
@@ -42,13 +37,12 @@ export default function RegisterScreen({ navigation, route }: any) {
   const [busy, setBusy] = useState(false);
   const [value, setValue] = useState(google?.email ?? "");
   const [country, setCountry] = useState(COUNTRIES[0]);
-  const [gender, setGender] = useState<Gender | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [agree, setAgree] = useState(false);
 
   const parsed = parseIdentifier(value, country);
   const valid =
-    name.trim().length > 1 && (!!google || parsed.valid) && !!gender && !!role && agree;
+    name.trim().length > 1 && (!!google || parsed.valid) && !!role && agree;
 
   const submit = async () => {
     if (busy) return;
@@ -61,7 +55,6 @@ export default function RegisterScreen({ navigation, route }: any) {
           identifier: google.email,
           googleId: google.googleId,
           role: toApiRole(role!),
-          gender: toApiGender(gender!) as any,
           profileImage: google.picture,
         });
         if (role === "user") {
@@ -78,9 +71,26 @@ export default function RegisterScreen({ navigation, route }: any) {
         identifier: parsed.value,
         kind: parsed.kind,
         mode: "register",
-        profile: { name: name.trim(), gender: gender!, role: role! },
+        profile: { name: name.trim(), role: role! },
       });
     } catch (e) {
+      if ((e as ApiError).code === PENDING_DELETION) {
+        // this email / number belongs to an account deleted < 90 days ago: offer to restore it
+        setBusy(false);
+        const answer = await askToRestore(errorMessage(e));
+        if (answer.isConfirmed) {
+          try {
+            setBusy(true);
+            await authService.sendOtp(parsed.value, "login", true);
+            navigation.navigate("Otp", { identifier: parsed.value, kind: parsed.kind, mode: "login", restore: true });
+          } catch (e2) {
+            toast.error(errorMessage(e2));
+          } finally {
+            setBusy(false);
+          }
+        }
+        return;
+      }
       toast.error(errorMessage(e));
     } finally {
       setBusy(false);
@@ -89,19 +99,28 @@ export default function RegisterScreen({ navigation, route }: any) {
 
   return (
     <AuthLayout
-      accent
-      title="Create your account"
-      subtitle="Sign up to get started"
+      lead="Create"
+      accent="your account"
+      subtitle="Sign up to get started with Won Pet Pro"
+      footer={
+        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: AUTH.ink, fontSize: 15 }}>Already have an account? </Text>
+          <Pressable onPress={() => navigation.navigate("Login")} hitSlop={8}>
+            <Text style={{ color: AUTH.orange, fontWeight: "800", fontSize: 15 }}>Sign In</Text>
+          </Pressable>
+        </View>
+      }
     >
-      <Field
+      <AuthField
         label="Full Name"
+        icon="person-outline"
         value={name}
         onChangeText={setName}
         placeholder="Enter your full name"
         autoCapitalize="words"
       />
       {google ? (
-        <Field label="Email" value={google.email} editable={false} />
+        <AuthField label="Email" icon="mail-outline" value={google.email} editable={false} />
       ) : (
         <IdentifierField
           value={value}
@@ -112,65 +131,52 @@ export default function RegisterScreen({ navigation, route }: any) {
       )}
 
       <View>
-        <Text className="font-bold text-ink mb-1.5">Gender</Text>
-        <View className="flex-row gap-3">
-          {GENDERS.map((g) => {
-            const on = gender === g.key;
-            return (
-              <Pressable
-                key={g.key}
-                onPress={() => setGender(g.key)}
-                className={cn(
-                  "flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-2xl border bg-white",
-                  on ? "border-primary bg-primary-soft" : "border-line",
-                )}
-              >
-                <Ionicons
-                  name={g.icon}
-                  size={17}
-                  color={on ? colors.primary : colors.text}
-                />
-                <Text
-                  className={cn(
-                    "font-semibold",
-                    on ? "text-primary-dark" : "text-ink",
-                  )}
-                >
-                  {g.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12, marginTop: 2 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: AUTH.border }} />
+          <Text style={{ marginHorizontal: 14, fontSize: 17, fontWeight: "800", color: AUTH.ink }}>Sign up as</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: AUTH.border }} />
         </View>
-      </View>
-
-      <View>
-        <Text className="font-bold text-ink mb-1.5">Select Role</Text>
-        <View className="flex-row gap-3">
+        <View style={{ flexDirection: "row", gap: 10 }}>
           {ROLES.map((r) => {
             const on = role === r.key;
             return (
               <Pressable
                 key={r.key}
                 onPress={() => setRole(r.key)}
-                className={cn(
-                  "flex-1 items-center gap-1.5 py-4 rounded-2xl border bg-white",
-                  on ? "border-primary bg-primary-soft" : "border-line",
-                )}
+                style={{
+                  flex: 1,
+                  minHeight: 128,
+                  paddingVertical: 10,
+                  paddingHorizontal: 6,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  borderRadius: 18,
+                  borderWidth: 1.5,
+                  borderColor: on ? AUTH.orange : "#E9E1DA",
+                  backgroundColor: on ? "#FFF3E8" : "rgba(255,255,255,0.85)",
+                }}
               >
-                <Ionicons
-                  name={r.icon}
-                  size={22}
-                  color={on ? colors.primary : colors.text}
-                />
-                <Text
-                  className={cn(
-                    "text-xs font-bold text-center",
-                    on ? "text-primary-dark" : "text-ink",
-                  )}
-                >
-                  {r.label}
-                </Text>
+                {roleIcon(r.key, on ? AUTH.orange : AUTH.ink)}
+                <Text style={{ fontSize: 12.5, fontWeight: "800", color: AUTH.ink, textAlign: "center" }}>{r.label}</Text>
+                <Text style={{ fontSize: 10, lineHeight: 13, color: "#6B7280", textAlign: "center" }}>{r.desc}</Text>
+                {on && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -8,
+                      right: -4,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: AUTH.orange,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="checkmark" size={15} color="#fff" />
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -179,20 +185,26 @@ export default function RegisterScreen({ navigation, route }: any) {
 
       <Pressable
         onPress={() => setAgree(!agree)}
-        className="flex-row items-center gap-3"
+        style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
       >
         <View
-          className={cn(
-            "w-6 h-6 rounded-md border-[1.5px] items-center justify-center",
-            agree ? "bg-primary border-primary" : "bg-white border-muted",
-          )}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            borderWidth: 2,
+            borderColor: AUTH.orange,
+            backgroundColor: agree ? AUTH.orange : "#fff",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           {agree && <Ionicons name="checkmark" size={16} color="#fff" />}
         </View>
-        <Text className="text-ink">
-          I agree to{" "}
+        <Text style={{ color: AUTH.ink, fontSize: 15 }}>
+          I agree to the{" "}
           <Text
-            className="text-primary font-bold"
+            style={{ color: AUTH.orange, fontWeight: "800" }}
             onPress={() =>
               Alert.alert(
                 "Terms & Conditions",
@@ -205,14 +217,11 @@ export default function RegisterScreen({ navigation, route }: any) {
         </Text>
       </Pressable>
 
-      <Button title={busy ? "Please wait…" : google ? "Create account" : "Sign Up"} disabled={!valid || busy} onPress={submit} />
-
-      <View className="flex-row justify-center">
-        <Text className="text-muted">Already have an account? </Text>
-        <Pressable onPress={() => navigation.navigate("Login")}>
-          <Text className="text-primary font-extrabold">Sign In</Text>
-        </Pressable>
-      </View>
+      <GradientButton
+        title={busy ? "Please wait…" : google ? "Create account" : "Sign Up"}
+        disabled={!valid || busy}
+        onPress={submit}
+      />
     </AuthLayout>
   );
 }

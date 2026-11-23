@@ -71,7 +71,7 @@ export default function RootNavigator() {
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: true, title: '', headerTransparent: true, headerTintColor: colors.text }} />
+            <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PetProfile" component={PetProfileScreen} options={{ headerShown: true, title: 'Pet Profile', headerTintColor: colors.text }} />
             <Stack.Screen name="AddPet" component={AddPetScreen} options={{ headerShown: true, title: 'Add New Pet', headerTintColor: colors.text }} />
             <Stack.Screen name="ManageTasks" component={ManageTasksScreen} options={{ headerShown: true, title: 'Manage Tasks', headerTintColor: colors.text }} />

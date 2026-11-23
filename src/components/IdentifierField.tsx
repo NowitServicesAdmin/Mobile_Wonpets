@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../theme";
 import { COUNTRIES, Country, isEmailInput } from "../utils/identifier";
 import { cn } from "./ui";
+import { AUTH, AuthLabel, authBox } from "./auth/AuthUI";
 
 type Props = {
   label?: string;
@@ -53,36 +54,30 @@ export default function IdentifierField({
 
   return (
     <View>
-      <Text className="font-bold text-ink mb-1.5">{label}</Text>
-      <View className="flex-row items-center bg-white border border-line rounded-2xl px-3.5">
-        {email ? (
-          <Ionicons
-            name="mail-outline"
-            size={20}
-            color={colors.muted}
-            style={{ marginRight: 10 }}
-          />
-        ) : (
+      <AuthLabel icon="mail-outline">{label}</AuthLabel>
+      <View style={authBox}>
+        {!email && (
           <Pressable
             onPress={() => setOpen(true)}
             hitSlop={8}
-            className="flex-row items-center mr-2.5"
+            style={{ flexDirection: "row", alignItems: "center" }}
           >
-            <Text className="text-xl mr-1">{country.flag}</Text>
+            <Text style={{ fontSize: 20, marginRight: 4 }}>{country.flag}</Text>
             <Ionicons name="caret-down" size={10} color={colors.muted} />
-            <Text className="font-semibold text-ink ml-2">{country.dial}</Text>
+            <Text style={{ fontWeight: "700", color: AUTH.ink, marginLeft: 6, fontSize: 15 }}>{country.dial}</Text>
+            <View style={{ width: 1, height: 22, backgroundColor: AUTH.border, marginHorizontal: 10 }} />
           </Pressable>
         )}
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#B8AEA5"
+          placeholderTextColor={AUTH.placeholder}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           maxLength={email ? 80 : 15}
-          className="flex-1 py-3.5 text-base text-ink"
+          style={{ flex: 1, fontSize: 14, color: AUTH.text, paddingVertical: 0 }}
         />
       </View>
 

@@ -3,7 +3,7 @@ import { Pressable, Text, TextInput, TextInputProps, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { cssInterop } from 'nativewind';
-import { colors } from '../theme';
+import { colors, gradients, shadows } from '../theme';
 
 cssInterop(LinearGradient, { className: 'style' });
 
@@ -42,6 +42,7 @@ export function Button({
   icon,
   className,
   disabled,
+  arrow,
 }: {
   title: string;
   onPress?: () => void;
@@ -49,6 +50,8 @@ export function Button({
   icon?: React.ReactNode;
   className?: string;
   disabled?: boolean;
+  /** trailing arrow, as on the sign-in / sign-up buttons */
+  arrow?: boolean;
 }) {
   const box =
     variant === "outline"
@@ -57,32 +60,43 @@ export function Button({
         ? "bg-white border-[1.5px] border-line"
         : variant === "danger"
           ? "bg-red"
-          : "bg-primary";
+          : "";
   const txt =
     variant === "outline"
       ? "text-primary"
       : variant === "neutral"
         ? "text-ink"
         : "text-white";
+  const primary = variant === "primary";
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      style={primary && !disabled ? shadows.button : undefined}
       className={cn(
-        "flex-row gap-2 items-center justify-center py-3.5 px-5 rounded-2xl active:opacity-80",
+        "flex-row gap-2 items-center justify-center py-3.5 px-5 rounded-full overflow-hidden active:opacity-80",
         box,
         disabled && "opacity-50",
         className,
       )}
     >
+      {primary && (
+        <LinearGradient
+          colors={gradients.primary}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+      )}
       {icon}
       <Text className={cn("font-bold text-[15px]", txt)}>{title}</Text>
+      {arrow && <Ionicons name="arrow-forward" size={18} color={variant === "outline" ? colors.primary : variant === "neutral" ? colors.text : "#fff"} />}
     </Pressable>
   );
 }
 
 export function Card({ children, className }: { children?: React.ReactNode; className?: string }) {
-  return <View className={cn('bg-white rounded-3xl p-4 border border-line', className)}>{children}</View>;
+  return <View style={shadows.card} className={cn('bg-white rounded-3xl p-4 border border-line', className)}>{children}</View>;
 }
 
 export function Chip({
@@ -126,12 +140,12 @@ export function Field({
 }: TextInputProps & { label?: string; hint?: string; className?: string }) {
   return (
     <View className={className}>
-      {!!label && <Text className="font-bold text-ink mb-1.5">{label}</Text>}
+      {!!label && <Text className="font-extrabold text-[13.5px] text-navy mb-1.5">{label}</Text>}
       <TextInput
         editable={editable}
-        placeholderTextColor={colors.muted}
+        placeholderTextColor="#A8A09A"
         className={cn(
-          'border-[1.5px] border-line rounded-2xl px-4 py-3.5 text-[15px] text-ink',
+          'border border-line rounded-2xl px-4 py-3 text-[15px] text-ink',
           editable ? 'bg-white' : 'bg-primary-soft opacity-70',
         )}
         {...props}
@@ -192,7 +206,7 @@ export function IconButton({
   badge?: number;
 }) {
   return (
-    <Pressable onPress={onPress} className="w-11 h-11 rounded-full bg-white border border-line items-center justify-center">
+    <Pressable onPress={onPress} style={shadows.card} className="w-11 h-11 rounded-full bg-white border border-line items-center justify-center active:bg-primary-soft">
       <Ionicons name={name} size={22} color={colors.text} />
       {!!badge && (
         <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary items-center justify-center">

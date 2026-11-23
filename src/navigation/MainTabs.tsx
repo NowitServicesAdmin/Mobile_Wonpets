@@ -3,7 +3,8 @@ import { Pressable, Text, View } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients, shadows } from '../theme';
 import AppHeader from '../components/AppHeader';
 import { useCart } from '../context/CartContext';
 import DashboardScreen from '../screens/main/DashboardScreen';
@@ -38,7 +39,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         style={{
           flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 30, padding: 6,
           borderWidth: 1, borderColor: colors.border,
-          elevation: 10, shadowColor: '#7C2D12', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 4 },
+          ...shadows.float,
         }}
       >
         {state.routes.map((route, index) => {
@@ -64,9 +65,17 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               onLongPress={onLongPress}
               style={{
                 flex: focused ? 2.1 : 1, height: 46, borderRadius: 23, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-                backgroundColor: focused ? colors.primary : 'transparent',
+                overflow: 'hidden',
               }}
             >
+              {focused && (
+                <LinearGradient
+                  colors={gradients.primary}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                />
+              )}
               <View>
                 <Ionicons name={focused ? on : off} size={22} color={focused ? '#fff' : colors.muted} />
                 {badge !== undefined && badge !== null && (
@@ -90,7 +99,7 @@ export default function MainTabs() {
     <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ header: () => <AppHeader /> }}>
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} />
-      <Tab.Screen name="Store" component={StoreScreen} options={{ tabBarBadge: cartCount > 0 ? cartCount : undefined }} />
+      <Tab.Screen name="Store" component={StoreScreen} options={{ headerShown: false, tabBarBadge: cartCount > 0 ? cartCount : undefined }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Profile', headerShown: false }} />
     </Tab.Navigator>
   );

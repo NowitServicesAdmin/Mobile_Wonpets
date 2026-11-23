@@ -18,7 +18,7 @@ export type ApiUser = {
   subscriptionPlan?: string;
   createdAt?: string;
 };
-export type Session = { token: string; user: ApiUser };
+export type Session = { token: string; user: ApiUser; restored?: boolean };
 
 /** The backend wants an e-mail in lower case or an E.164 phone number (+919876543210, no spaces). */
 export const normalizeIdentifier = (v: string) => {
@@ -28,8 +28,9 @@ export const normalizeIdentifier = (v: string) => {
 
 export const authService = {
   /** type "login" fails for unknown users, "signup" fails for existing ones. */
-  async sendOtp(identifier: string, type: 'login' | 'signup') {
-    const { data } = await api.post('/auth/send-otp', { identifier: normalizeIdentifier(identifier), type });
+  async sendOtp(identifier: string, type: 'login' | 'signup', restore = false) {
+    // `restore: true` = the person said yes to "Restore your account?" (account deleted < 90 days ago)
+    const { data } = await api.post('/auth/send-otp', { identifier: normalizeIdentifier(identifier), type, ...(restore === true ? { restore: true } : {}) });
     return data as { success: boolean; message: string };
   },
 
@@ -39,7 +40,7 @@ export const authService = {
   async verifyOtp(identifier: string, otp: string): Promise<Session> {
     const id = normalizeIdentifier(identifier);
     const { data } = await api.post('/auth/verify-otp', id.includes('@') ? { email: id, otp } : { phone: id, otp });
-    return { token: data.token, user: data.user };
+    return { token: data.token, user: data.user, restored: data.restored === true };
   },
 
   async register(p: {
@@ -48,7 +49,6 @@ export const authService = {
     otp?: string;
     googleId?: string;
     role: ApiRole;
-    gender: 'male' | 'female' | 'others';
     profileImage?: string;
   }): Promise<Session> {
     const { data } = await api.post('/auth/register', {
@@ -60,10 +60,10 @@ export const authService = {
   },
 
   /** Existing account -> a session. Unknown e-mail -> `isNewUser` + the Google profile to prefill sign-up. */
-  async googleLogin(accessToken: string) {
-    const { data } = await api.post('/auth/google', { accessToken });
+  async googleLogin(accessToken: string, restore = false) {
+    const { data } = await api.post('/auth/google', { accessToken, ...(restore === true ? { restore: true } : {}) });
     return data as
-      | { success: true; token: string; user: ApiUser; isNewUser?: undefined }
+      | { success: true; token: string; user: ApiUser; restored?: boolean; isNewUser?: undefined }
       | { success: true; isNewUser: true; googleProfile: { email: string; name: string; picture?: string; googleId: string } };
   },
 

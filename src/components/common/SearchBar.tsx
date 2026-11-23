@@ -10,9 +10,10 @@ import { cn } from '../ui';
  * `onCamera` adds a "search by photo" camera icon inside the box (`scanning` swaps it for a spinner).
  */
 export default function SearchBar({
-  value, onChangeText, placeholder = 'Search…', trailing, className, onCamera, scanning,
+  value, onChangeText, placeholder = 'Search…', trailing, className, onCamera, scanning, onFocus, onSubmit,
 }: {
   value: string; onChangeText: (t: string) => void; placeholder?: string;
+  onFocus?: () => void; onSubmit?: () => void;
   onCamera?: () => void; scanning?: boolean;
   trailing?: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; badge?: number };
   className?: string;
@@ -22,7 +23,7 @@ export default function SearchBar({
     <View className={cn('flex-row gap-2', className)}>
       <View className="flex-1 flex-row items-center gap-2 bg-white border border-line rounded-2xl px-3">
         <Ionicons name="search-outline" size={18} color={colors.muted} />
-        <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#B8AEA5" className="flex-1 py-3 text-ink" autoCorrect={false} />
+        <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#B8AEA5" className="flex-1 py-3 text-ink" autoCorrect={false} returnKeyType={onSubmit ? 'search' : undefined} onFocus={onFocus} onSubmitEditing={onSubmit} />
         {!!value && <Pressable onPress={() => onChangeText('')} hitSlop={8} accessibilityLabel="Clear search"><Ionicons name="close-circle" size={18} color="#CDBFB0" /></Pressable>}
         {!!onCamera && (scanning
           ? <ActivityIndicator size="small" color={colors.primary} />

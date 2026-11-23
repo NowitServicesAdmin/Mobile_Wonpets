@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Anchor, measureAnchor, useAnchorRef } from './Popover';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../theme';
+import { colors, shadows } from '../../theme';
 import { Avatar } from '../Avatar';
 import { cn } from '../ui';
 
@@ -18,13 +18,17 @@ export function HeaderButton({ icon, label, onPress, badge, size = 40 }: TopBarA
       accessibilityLabel={label}
       hitSlop={6}
       onPress={onPress}
-      style={{ width: size, height: size }}
+      style={[{ width: size, height: size }, shadows.card]}
       className="rounded-full bg-white border border-line items-center justify-center active:bg-primary-soft"
     >
       <Ionicons name={icon} size={size >= 42 ? 20 : 19} color={colors.text} />
       {!!badge && badge > 0 && (
-        <View className="absolute -top-1.5 -right-1.5 bg-red min-w-[18px] h-[18px] rounded-full items-center justify-center px-1 border-2 border-cream">
-          <Text className="text-white text-[9px] font-extrabold">{badge > 99 ? '99+' : badge}</Text>
+        // explicit size + line height so the digits are never clipped (Android adds font padding that cut them at the edges)
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: -2, right: -3, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, backgroundColor: colors.red, borderWidth: 2, borderColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text allowFontScaling={false} numberOfLines={1} style={{ color: '#fff', fontSize: 10, lineHeight: 12, fontWeight: '800', textAlign: 'center', includeFontPadding: false }}>{badge > 99 ? '99+' : badge}</Text>
         </View>
       )}
     </Pressable>
@@ -66,7 +70,7 @@ export default function TopBar({
           ? <Pressable ref={avatarRef} collapsable={false} onPress={() => measureAnchor(avatarRef, onAvatarPress)} accessibilityRole="button" accessibilityLabel={avatarLabel} className="active:opacity-80">{avatar}</Pressable>
           : avatar}
         <View className="flex-1 ml-1">
-          {typeof title === 'string' ? <Text className="text-[18px] font-black text-ink" numberOfLines={1}>{title}</Text> : title}
+          {typeof title === 'string' ? <Text className="text-[19px] font-black text-navy" numberOfLines={1}>{title}</Text> : title}
           {subtitle}
         </View>
         {actions.map((a) => <HeaderButton key={a.label} {...a} size={actionSize} />)}

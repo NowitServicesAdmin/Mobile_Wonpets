@@ -1,10 +1,9 @@
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import { Button } from './ui';
+import { GoogleButton } from './auth/AuthUI';
 import { toast } from './WonPetsAlert';
 import { GOOGLE } from '../config/env';
 
@@ -50,13 +49,5 @@ export default function GoogleSignInButton({ onToken, disabled }: { onToken: (ac
     }
   };
 
-  return (
-    <Button
-      title="Continue with Google"
-      variant="neutral"
-      disabled={!request || disabled}
-      icon={<Ionicons name="logo-google" size={18} color="#EA4335" />}
-      onPress={start}
-    />
-  );
+  return <GoogleButton disabled={!request || disabled} onPress={start} />;
 }

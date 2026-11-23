@@ -51,6 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await tokenStore.clear();
+    // Logging out returns to the landing (onboarding) screens, not straight to Sign in / Sign up.
+    await AsyncStorage.removeItem(KEY_ONB);
+    setOnboarded(false);
     await persist(null);
   }, []);
 

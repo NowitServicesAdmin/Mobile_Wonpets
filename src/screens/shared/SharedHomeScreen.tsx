@@ -1,12 +1,12 @@
 import { useLiveSync } from '../../context/LiveSyncContext';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
-import { Card, Chip, Empty, Gradient, SectionHeader, T, cn } from '../../components/ui';
+import { Card, Empty, Gradient, T, cn } from '../../components/ui';
 import { Avatar } from '../../components/Avatar';
-import ProgressRing from '../../components/ProgressRing';
-import CompletableRow, { AllDoneNote } from '../../components/dashboard/CompletableRow';
+import { Panel, PanelHeader } from '../../components/doctor/DoctorUI';
+import CompletableRow, { ROW_EXIT_TOTAL_MS } from '../../components/dashboard/CompletableRow';
 import { toast } from '../../components/WonPetsAlert';
 import { useAuth } from '../../context/AuthContext';
 import { useManaged } from '../../context/ManagedContext';
@@ -15,8 +15,13 @@ import { errorMessage } from '../../services/api';
 import { timeToMinutes } from '../../utils/schedule';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-// the task list scrolls inside the card (roughly 4 rows visible) instead of stretching the whole screen
-const TASK_LIST_MAX_HEIGHT = 320;
+
+// Same approach as the owner dashboard: fixed-height rows, a few show, the rest scroll inside the card instead of stretching the page.
+const ROW_H = 50;
+const ROW_GAP = 6;
+const VISIBLE_ROWS = 4;
+const LIST_MAX = ROW_H * VISIBLE_ROWS + ROW_GAP * (VISIBLE_ROWS - 1);
+const CARD_GAP = 10;
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 function greeting() {
@@ -34,35 +39,53 @@ function taskStyle(t: ManagedTask): { icon: IconName; box: string; fg: string } 
   return { icon: 'calendar-outline', box: 'bg-green-soft', fg: colors.green };
 }
 
-function Stat({ icon, tint, bg, value, label }: { icon: IconName; tint: string; bg: string; value: number | string; label: string }) {
-  return (
-    <View className="flex-1 flex-row items-center justify-center gap-2 px-1.5">
-      <View className={cn('w-9 h-9 rounded-full items-center justify-center', bg)}><Ionicons name={icon} size={18} color={tint} /></View>
-      <View>
-        <Text maxFontSizeMultiplier={1.1} className="font-extrabold text-ink text-[15px]">{value}</Text>
-        <Text maxFontSizeMultiplier={1.1} className="text-[10.5px] text-muted">{label}</Text>
-      </View>
-    </View>
-  );
-}
-
-/** Overlapping pet photos for the hero. */
+/** Overlapping pet photos for the hero (kept small so the hero stays short). */
 function PetStack({ pets }: { pets: SharedPet[] }) {
-  const shown = pets.slice(0, 4);
+  const shown = pets.slice(0, 3);
   const extra = pets.length - shown.length;
   return (
     <View className="flex-row items-center">
       {shown.map((p, i) => (
-        <View key={p.id} style={{ marginLeft: i === 0 ? 0 : -16, zIndex: shown.length - i }} className="rounded-full border-[3px] border-white">
-          <Avatar image={p.image} emoji={p.emoji} size={52} />
+        <View key={p.id} style={{ marginLeft: i === 0 ? 0 : -14, zIndex: shown.length - i }} className="rounded-full border-[3px] border-white">
+          <Avatar image={p.image} emoji={p.emoji} size={46} />
         </View>
       ))}
       {extra > 0 && (
-        <View style={{ marginLeft: -16 }} className="w-[52px] h-[52px] rounded-full bg-primary border-[3px] border-white items-center justify-center">
-          <Text className="text-white font-extrabold text-sm">+{extra}</Text>
+        <View style={{ marginLeft: -14 }} className="w-[46px] h-[46px] rounded-full bg-primary border-[3px] border-white items-center justify-center">
+          <Text className="text-white font-extrabold text-[13px]">+{extra}</Text>
         </View>
       )}
     </View>
+  );
+}
+
+type TileProps = { icon: IconName; box: string; fg: string; value: number | string; label: string };
+function StatTile({ icon, box, fg, value, label }: TileProps) {
+  return (
+    <View className="flex-1 bg-white rounded-2xl border border-line px-1.5 py-2 items-center">
+      <View className={cn('w-7 h-7 rounded-full items-center justify-center', box)}><Ionicons name={icon} size={15} color={fg} /></View>
+      <Text maxFontSizeMultiplier={1.1} className="text-[15px] font-black text-ink leading-5 mt-1">{value}</Text>
+      <Text maxFontSizeMultiplier={1.1} className="text-[10px] text-muted" numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
+/** Slim "all done" note once the last task has slid away (waits for the exit animation). */
+function DoneNote({ show }: { show: boolean }) {
+  const op = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!show) { op.setValue(0); return; }
+    Animated.timing(op, { toValue: 1, duration: 350, delay: ROW_EXIT_TOTAL_MS, useNativeDriver: true }).start();
+  }, [show]);
+  if (!show) return null;
+  return (
+    <Animated.View style={{ opacity: op }} className="flex-row items-center justify-center gap-2 py-3">
+      <Text className="text-2xl">🎉</Text>
+      <View>
+        <Text className="text-[14px] font-bold text-ink">All done for today</Text>
+        <Text className="text-[11px] text-muted">Completed tasks are tucked away.</Text>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -70,6 +93,7 @@ function PetStack({ pets }: { pets: SharedPet[] }) {
 export default function SharedHomeScreen() {
   const { user } = useAuth();
   const { accounts, exitManaged } = useManaged();
+  const { width } = useWindowDimensions();
   const [pets, setPets] = useState<SharedPet[]>([]);
   const [tasks, setTasks] = useState<ManagedTask[]>([]);
   const [appts, setAppts] = useState<SharedAppointment[]>([]);
@@ -114,7 +138,8 @@ export default function SharedHomeScreen() {
   const actionable = visible.filter((t) => t.itemType !== 'appointment');
   const completedCount = actionable.filter((t) => t.status === 'completed').length;
   const remaining = actionable.length - completedCount;
-  const pct = actionable.length ? completedCount / actionable.length : 0;
+  const pct = actionable.length ? Math.round((completedCount / actionable.length) * 100) : 0;
+  const nextTask = visible.find((t) => t.status !== 'completed');
 
   const complete = async (t: ManagedTask) => {
     const mark = (status: ManagedTask['status']) => setTasks((xs) => xs.map((x) => (x.key === t.key ? { ...x, status } : x)));
@@ -132,47 +157,45 @@ export default function SharedHomeScreen() {
   );
 
   const firstName = (user?.name ?? 'there').trim().split(' ')[0];
+  // screen padding (14 x 2) + panel padding (14 x 2); with several visits the next card peeks in from the right
+  const inner = width - 56;
+  const cardW = upcoming.length > 1 ? Math.min(300, Math.round(inner * 0.86)) : inner;
+  const multiOwner = owners.length > 1;
 
   return (
     <ScrollView
       className="flex-1 bg-cream"
-      contentContainerClassName="p-4 gap-[18px] pb-10"
+      contentContainerClassName="p-3.5 gap-3 pb-8"
       refreshControl={<RefreshControl refreshing={loading && pets.length > 0} onRefresh={load} tintColor={colors.primary} />}
     >
-      {/* hero */}
-      <Gradient colorsArr={['#FFEFCE', '#FFFFFF']} className="rounded-3xl p-4 border border-[#F2C46D] overflow-hidden">
-        <View className="flex-row items-center justify-between">
-          <Chip label="Shared with you" tone="white" />
-          <Pressable onPress={exitManaged} accessibilityRole="button" accessibilityLabel="Switch to My Account" className="flex-row items-center gap-1.5 bg-white border border-line rounded-full px-3 py-1.5 active:opacity-80">
-            <Ionicons name="swap-horizontal" size={13} color={colors.primary} />
-            <Text className="text-primary text-[11px] font-extrabold">My Account</Text>
-          </Pressable>
-        </View>
-
-        <View className="flex-row items-center gap-3 mt-3.5">
+      {/* hero: same size and layout as the owner dashboard hero; the 4th tile switches back to My Account */}
+      <Gradient colorsArr={['#FFEFCE', '#FFFFFF']} className="rounded-3xl p-3.5 border border-[#F2C46D] overflow-hidden">
+        <View className="flex-row items-center gap-3">
           <View className="flex-1">
-            <Text maxFontSizeMultiplier={1.1} className="text-[15px] font-semibold text-muted">{greeting()}</Text>
-            <Text maxFontSizeMultiplier={1.1} className="text-[26px] font-black text-primary leading-8" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{firstName} 👋</Text>
-            <Text maxFontSizeMultiplier={1.1} className="text-[13px] text-muted leading-[18px] mt-1.5" numberOfLines={3}>
+            <Text maxFontSizeMultiplier={1.1} className="text-[13px] font-semibold text-muted">{greeting()}</Text>
+            <Text maxFontSizeMultiplier={1.1} className="text-[22px] font-black text-primary leading-7" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{firstName} 👋</Text>
+            <Text maxFontSizeMultiplier={1.1} className="text-[12px] text-muted leading-4 mt-1" numberOfLines={2}>
               {pets.length > 0
-                ? <>You're looking after <Text className="text-green font-bold">{pets.length} {pets.length === 1 ? 'pet' : 'pets'}</Text>{owners.length ? ` from ${owners.join(', ')}` : ''}. 🧡</>
+                ? <>Caring for <Text className="text-green font-bold">{pets.length} {pets.length === 1 ? 'pet' : 'pets'}</Text>{owners.length ? ` from ${owners.join(', ')}` : ''} 🧡</>
                 : 'Pets shared with you will show up here.'}
             </Text>
           </View>
           {pets.length > 0 && <PetStack pets={pets} />}
         </View>
 
-        <View className="flex-row bg-white rounded-2xl border border-line mt-3.5 py-3">
-          <Stat icon="paw-outline" tint={colors.primary} bg="bg-primary-soft" value={pets.length} label="Pets" />
-          <View className="w-px bg-line" />
-          <Stat icon="time-outline" tint={colors.purple} bg="bg-purple-soft" value={remaining} label="Tasks left" />
-          <View className="w-px bg-line" />
-          <Stat icon="medkit-outline" tint={colors.blue} bg="bg-blue-soft" value={upcoming.length} label="Visits" />
-        </View>
-
-        <View className="flex-row items-center gap-2 mt-3">
-          <Ionicons name="eye-outline" size={14} color={colors.muted} />
-          <Text className="flex-1 text-[11.5px] text-muted leading-4">View-only access to records. You can mark schedule tasks as done.</Text>
+        <View className="flex-row gap-1.5 mt-3">
+          <StatTile icon="paw-outline" box="bg-orange-100" fg="#F97316" value={pets.length} label="Pets" />
+          <StatTile icon="time-outline" box="bg-purple-100" fg="#8B5CF6" value={remaining} label="Tasks left" />
+          <StatTile icon="medkit-outline" box="bg-blue-100" fg="#3B82F6" value={upcoming.length} label="Visits" />
+          <Pressable
+            onPress={exitManaged}
+            accessibilityRole="button"
+            accessibilityLabel="Switch to My Account"
+            className="flex-1 bg-primary-soft rounded-2xl border border-primary px-1.5 py-2 items-center justify-center active:opacity-80"
+          >
+            <View className="w-7 h-7 rounded-full bg-white items-center justify-center"><Ionicons name="swap-horizontal" size={15} color={colors.primary} /></View>
+            <Text maxFontSizeMultiplier={1.1} className="text-[10.5px] font-extrabold text-primary mt-1.5" numberOfLines={1}>My Account</Text>
+          </Pressable>
         </View>
       </Gradient>
 
@@ -182,143 +205,125 @@ export default function SharedHomeScreen() {
         <Card><Empty emoji="🐾" title="No shared pets yet" body="When an owner shares their pets with you and the access dates start, they show up here." /></Card>
       ) : (
         <>
-          {/* pet filter */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
-            <Chip label="All pets" active={petId === 'all'} onPress={() => setPetId('all')} className="py-2 px-4" />
-            {pets.map((p) => {
-              const on = petId === p.id;
-              return (
-                <Pressable key={p.id} onPress={() => setPetId(p.id)} accessibilityRole="button" accessibilityLabel={p.name} className={cn('flex-row items-center gap-2 rounded-full border pl-1 pr-3.5 py-1', on ? 'bg-primary border-primary' : 'bg-white border-line')}>
-                  <Avatar image={p.image} emoji={p.emoji} size={28} />
-                  <Text className={cn('text-xs font-bold', on ? 'text-white' : 'text-ink')}>{p.name}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* today's schedule (same design as the owner dashboard) */}
-          <Card className="border-orange-100">
-            {/* header */}
-            <View className="flex-row items-center gap-2.5 mb-3">
-              <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center"><Ionicons name="calendar-outline" size={19} color={colors.primary} /></View>
+          {/* today's schedule */}
+          <Panel compact className="border-orange-100">
+            <View className="flex-row items-center gap-2 mb-2.5">
+              <View className="w-8 h-8 rounded-full bg-orange-100 items-center justify-center"><Ionicons name="calendar" size={15} color={colors.primary} /></View>
               <View className="flex-1">
-                <Text className={T.h2}>Today's Schedule</Text>
-                <Text className={T.small}>{remaining === 0 && actionable.length > 0 ? 'All done for today 🎉' : `${remaining} task${remaining === 1 ? '' : 's'} remaining today`}</Text>
+                <Text maxFontSizeMultiplier={1.1} className="text-[15px] font-extrabold text-ink" numberOfLines={1}>Today's Schedule</Text>
+                <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted" numberOfLines={1}>
+                  {remaining} {remaining === 1 ? 'task' : 'tasks'} left{nextTask ? ` · Next ${nextTask.time}` : ''}
+                </Text>
               </View>
             </View>
 
-            {/* progress */}
-            <View className="flex-row items-center gap-2 bg-orange-100 rounded-2xl p-2.5 mb-3">
-              <View className="bg-white/70 rounded-xl h-16 w-[70px] items-center justify-center">
-                <ProgressRing color={colors.primary} progress={pct} size={52} stroke={5}>
-                  <Text className="text-[11px] font-extrabold text-primary-dark">{Math.round(pct * 100)}%</Text>
-                </ProgressRing>
-              </View>
-              {([['Completed', completedCount, 'text-green'], ['Remaining', remaining, 'text-primary-dark'], ['Total', actionable.length, 'text-muted']] as const).map(([k, v, c]) => (
-                <View key={k} className="flex-1 bg-white/70 rounded-xl h-16 px-2.5 justify-center">
-                  <Text className="text-[10px] font-medium text-muted">{k}</Text>
-                  <Text className={cn('text-lg font-extrabold', c)}>{v}</Text>
-                </View>
-              ))}
-            </View>
+            {/* pet filter: one slim row */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5 mb-2.5">
+              <Pressable onPress={() => setPetId('all')} accessibilityRole="button" accessibilityState={{ selected: petId === 'all' }} className={cn('h-8 justify-center rounded-full border px-3.5', petId === 'all' ? 'bg-primary border-primary' : 'bg-white border-line')}>
+                <Text className={cn('text-xs font-bold', petId === 'all' ? 'text-white' : 'text-ink')}>All pets</Text>
+              </Pressable>
+              {pets.map((p) => {
+                const on = petId === p.id;
+                return (
+                  <Pressable key={p.id} onPress={() => setPetId(p.id)} accessibilityRole="button" accessibilityLabel={p.name} accessibilityState={{ selected: on }} className={cn('h-8 flex-row items-center gap-1.5 rounded-full border pl-1 pr-3', on ? 'bg-primary border-primary' : 'bg-white border-line')}>
+                    <Avatar image={p.image} emoji={p.emoji} size={24} />
+                    <Text className={cn('text-xs font-bold', on ? 'text-white' : 'text-ink')}>{p.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
             {visible.length === 0 ? (
-              <View className="py-10 items-center">
-                <Text className="text-4xl mb-2">📅</Text>
-                <Text className={T.h3}>Nothing planned today</Text>
-                <Text className={T.small + ' mt-1 text-center'}>No tasks or visits are scheduled for the shared pets.</Text>
+              <View className="flex-row items-center gap-3 bg-orange-50/60 border border-orange-100 rounded-2xl p-3">
+                <View className="w-9 h-9 rounded-xl bg-orange-100 items-center justify-center"><Ionicons name="calendar" size={17} color={colors.primary} /></View>
+                <View className="flex-1">
+                  <Text className="text-[14px] font-bold text-ink">Nothing planned today</Text>
+                  <Text className="text-[11px] text-muted" numberOfLines={1}>No tasks or visits for the shared pets.</Text>
+                </View>
               </View>
             ) : (
               <>
-                {/* only the task list scrolls, the card stays put */}
-                <ScrollView
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator
-                  style={{ maxHeight: TASK_LIST_MAX_HEIGHT }}
-                  contentContainerStyle={{ paddingBottom: 0 }}
-                >
+                {/* progress: one slim bar */}
+                <View className="flex-row items-center gap-2 mb-2.5">
+                  <View className="flex-1 h-1.5 bg-orange-100 rounded-full overflow-hidden"><View style={{ width: `${pct}%` }} className="h-full bg-primary rounded-full" /></View>
+                  <Text maxFontSizeMultiplier={1.1} className="text-[11px] font-bold text-muted">{completedCount}/{actionable.length} done · {pct}%</Text>
+                </View>
+
+                {/* only the list scrolls, the card stays put */}
+                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={visible.length > VISIBLE_ROWS} style={{ maxHeight: LIST_MAX }}>
                   {visible.map((t) => {
                     const st = taskStyle(t);
                     const isAppt = t.itemType === 'appointment';
                     const done = t.status === 'completed';
                     const pet = petById[t.petId];
                     return (
-                      <CompletableRow key={t.key} done={done}>
-                      <View className={cn('flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', done ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
-                        <View className={cn('w-10 h-10 rounded-xl items-center justify-center', st.box)}><Ionicons name={st.icon} size={19} color={st.fg} /></View>
-                        <View className="flex-1">
-                          <Text maxFontSizeMultiplier={1.1} className={cn('text-[14px] font-extrabold', done ? 'line-through text-muted' : 'text-ink')} numberOfLines={1}>{t.title}</Text>
-                          <Text maxFontSizeMultiplier={1.1} className="text-[12px] text-muted mt-0.5" numberOfLines={1}>
-                            <Text className="font-bold text-primary">{t.time}</Text>{`  ·  ${pet?.name ?? 'Pet'}`}{t.ownerName ? ` (${t.ownerName})` : ''}
-                          </Text>
-                          {!!t.description && <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted mt-0.5" numberOfLines={1}>{t.description}</Text>}
-                        </View>
-                        {isAppt ? (
-                          <View className="bg-blue-soft px-2.5 py-1.5 rounded-full">
-                            <Text maxFontSizeMultiplier={1.1} className="text-[11px] font-bold text-blue">{t.apptStatus || 'Confirmed'}</Text>
+                      <CompletableRow key={t.key} done={done} gap={ROW_GAP}>
+                        <View style={{ height: ROW_H }} className={cn('flex-row items-center gap-2 rounded-2xl border px-2.5', done ? 'bg-white border-green-soft' : 'bg-cream border-line')}>
+                          <View className={cn('w-9 h-9 rounded-xl items-center justify-center', st.box)}><Ionicons name={st.icon} size={17} color={st.fg} /></View>
+                          <View className="flex-1">
+                            <Text maxFontSizeMultiplier={1.1} className={cn('text-[13px] font-extrabold', done ? 'line-through text-muted' : 'text-ink')} numberOfLines={1}>{t.title}</Text>
+                            <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted" numberOfLines={1}>
+                              <Text className="font-bold text-primary">{t.time}</Text>{`  ·  ${pet?.name ?? 'Pet'}`}{multiOwner && t.ownerName ? ` (${t.ownerName})` : ''}
+                            </Text>
                           </View>
-                        ) : done ? (
-                          <View className="w-9 h-9 rounded-full bg-green-soft items-center justify-center"><Ionicons name="checkmark" size={19} color={colors.green} /></View>
-                        ) : (
-                          <Pressable onPress={() => complete(t)} accessibilityRole="button" accessibilityLabel={`Mark ${t.title} complete`} className="w-9 h-9 rounded-full bg-primary items-center justify-center active:opacity-80">
-                            <Ionicons name="checkmark" size={20} color="#fff" />
-                          </Pressable>
-                        )}
-                      </View>
+                          {isAppt ? (
+                            <View className="bg-blue-soft px-2 py-1 rounded-full">
+                              <Text maxFontSizeMultiplier={1.1} className="text-[10px] font-bold text-blue">{t.apptStatus || 'Confirmed'}</Text>
+                            </View>
+                          ) : done ? (
+                            <View className="w-8 h-8 rounded-full bg-green-soft items-center justify-center"><Ionicons name="checkmark" size={17} color={colors.green} /></View>
+                          ) : (
+                            <Pressable onPress={() => complete(t)} accessibilityRole="button" accessibilityLabel={`Mark ${t.title} complete`} className="w-8 h-8 rounded-full bg-primary items-center justify-center active:opacity-80">
+                              <Ionicons name="checkmark" size={18} color="#fff" />
+                            </Pressable>
+                          )}
+                        </View>
                       </CompletableRow>
                     );
                   })}
                 </ScrollView>
-                <AllDoneNote show={visible.every((t) => t.status === 'completed')} />
-
-                {/* bottom summary */}
-                <View className="flex-row gap-2 mt-3 pt-3.5 border-t border-orange-100">
-                  {([
-                    ['Next Task', visible.find((t) => t.status !== 'completed')?.time ?? '✓', 'calendar-outline', 'bg-purple-soft', colors.purple],
-                    ['Total Tasks', String(actionable.length), 'time-outline', 'bg-primary-soft', colors.primary],
-                    ['Completed', String(completedCount), 'checkmark-circle-outline', 'bg-green-soft', colors.green],
-                  ] as const).map(([k, v, icon, box, fg]) => (
-                    <View key={k} className="flex-1 flex-row items-center gap-1.5">
-                      <View className={cn('w-8 h-8 rounded-full items-center justify-center', box)}><Ionicons name={icon} size={15} color={fg} /></View>
-                      <View className="flex-1">
-                        <Text className="text-[9px] text-muted" numberOfLines={1}>{k}</Text>
-                        <Text className="text-xs font-bold text-ink" numberOfLines={1}>{v}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+                <DoneNote show={visible.every((t) => t.status === 'completed')} />
               </>
             )}
-          </Card>
+          </Panel>
 
-          {/* upcoming appointments */}
-          <Card>
-            <SectionHeader
-              title="Upcoming Appointments"
-              subtitle="View only"
-              icon={<View className="w-10 h-10 rounded-full bg-blue-soft items-center justify-center"><Ionicons name="medkit-outline" size={19} color={colors.blue} /></View>}
-            />
-            {upcoming.length === 0 && <Text className={cn(T.small, 'py-2 text-center')}>No upcoming appointments.</Text>}
-            <View className="gap-2.5">
-              {upcoming.map((a) => {
-                const d = a.isoDate ? new Date(`${a.isoDate}T00:00:00`) : null;
-                return (
-                  <View key={a.id} className="flex-row items-center gap-3 rounded-2xl border border-line p-3">
-                    <View className="w-[50px] rounded-2xl bg-primary-soft items-center py-1.5">
-                      <Text className="text-[10px] font-extrabold text-primary">{d ? MONTHS[d.getMonth()] : '—'}</Text>
-                      <Text className="text-[20px] font-black text-ink leading-6">{d ? d.getDate() : '--'}</Text>
+          {/* upcoming appointments: a swipeable strip, so it never makes the page taller */}
+          <Panel compact>
+            <PanelHeader compact icon="medkit" tone="blue" title={`Upcoming Visits • ${upcoming.length}`} caption="View only" />
+            {upcoming.length === 0 ? (
+              <Text className={cn(T.small, 'py-1 text-center')}>No upcoming appointments.</Text>
+            ) : (
+              <FlatList
+                data={upcoming}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(a) => a.id}
+                snapToInterval={cardW + CARD_GAP}
+                decelerationRate="fast"
+                contentContainerStyle={{ gap: CARD_GAP }}
+                renderItem={({ item: a }) => {
+                  const d = a.isoDate ? new Date(`${a.isoDate}T00:00:00`) : null;
+                  const ok = a.status === 'Confirmed';
+                  return (
+                    <View style={{ width: cardW }} className="flex-row items-center gap-2.5 rounded-2xl border border-orange-100 bg-orange-50/60 p-2.5">
+                      <View className="w-[44px] rounded-xl bg-white border border-line items-center py-1">
+                        <Text className="text-[9.5px] font-extrabold text-primary">{d ? MONTHS[d.getMonth()] : '—'}</Text>
+                        <Text className="text-[18px] font-black text-ink leading-5">{d ? d.getDate() : '--'}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-[13px] font-extrabold text-ink">{a.pet} · {a.mode}</Text>
+                        <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-[11px] text-muted">{a.time}{a.doctor ? ` · ${a.doctor}` : ''}</Text>
+                        {multiOwner && <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-[11px] text-muted">{a.ownerName}</Text>}
+                      </View>
+                      <View className={cn('px-2 py-1 rounded-full', ok ? 'bg-green-soft' : 'bg-yellow-soft')}>
+                        <Text maxFontSizeMultiplier={1.1} className={cn('text-[10px] font-bold', ok ? 'text-green' : 'text-yellow')}>{a.status}</Text>
+                      </View>
                     </View>
-                    <View className="flex-1">
-                      <Text numberOfLines={1} className={T.h3}>{a.pet} · {a.mode}</Text>
-                      <Text numberOfLines={1} className={T.small}>{a.time}{a.doctor ? ` · ${a.doctor}` : ''}</Text>
-                      <Text numberOfLines={1} className={T.small}>{a.ownerName}</Text>
-                    </View>
-                    <Chip label={a.status} tone={a.status === 'Confirmed' ? 'green' : 'yellow'} />
-                  </View>
-                );
-              })}
-            </View>
-          </Card>
+                  );
+                }}
+              />
+            )}
+          </Panel>
         </>
       )}
     </ScrollView>

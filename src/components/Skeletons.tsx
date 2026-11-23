@@ -200,6 +200,29 @@ export function AppointmentListSkeleton({ count = 3 }: { count?: number }) {
   return <View className="gap-3.5">{Array.from({ length: count }).map((_, i) => <AppointmentCardSkeleton key={i} />)}</View>;
 }
 
+/** Compact card placeholder that matches UserAppointmentCard (pet photo + three text rows). */
+export function UserAppointmentCardSkeleton() {
+  return (
+    <View className="flex-row items-center gap-2.5 p-2.5 bg-white rounded-2xl border border-line">
+      <Skeleton className="h-[46px] w-[46px]" round />
+      <View className="flex-1 gap-2">
+        <View className="flex-row items-center justify-between"><Skeleton className="h-4 w-24" /><Skeleton className="h-5 w-20" round /></View>
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </View>
+    </View>
+  );
+}
+
+/** Skeleton rows for the user's Appointments list: first load (6) and every "load next 6" step. */
+export function UserAppointmentListSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityLabel="Loading appointments" className="gap-2.5">
+      {Array.from({ length: count }).map((_, i) => <UserAppointmentCardSkeleton key={i} />)}
+    </View>
+  );
+}
+
 export function AppointmentDetailSkeleton() {
   return (
     <SkeletonScreen className="p-4 gap-3">

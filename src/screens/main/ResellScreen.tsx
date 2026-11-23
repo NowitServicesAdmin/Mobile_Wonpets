@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, LayoutChangeEvent, Pressable, ScrollView, Text, View } from "react-native";
+import { FlatList, Image, Keyboard, LayoutChangeEvent, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme";
 import { Empty, Gradient, SectionHeader, T, cn } from "../../components/ui";
@@ -23,6 +23,9 @@ import { areaCity } from "../../utils/location";
 import { searchByPhoto } from "../../utils/imageSearch";
 import PhotoItemChips from "../../components/common/PhotoItemChips";
 import { VisualSearchItem } from "../../services/shared.service";
+import { Suggestion, useSuggestions } from "../../hooks/useSuggestions";
+import SuggestionDropdown from "../../components/common/SuggestionDropdown";
+import { inr } from "../../utils/orders";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -241,6 +244,36 @@ export default function ResellScreen({ navigation }: any) {
     return out.sort(by[sort]);
   }, [available, q, tab, subTab, filters, sort, onlySaved, recentOnly, favourites]);
 
+  // suggestions while typing - resell listings only (never store products). Names that start with the text come first.
+  const sg = useSuggestions(
+    q,
+    (term): Suggestion[] => {
+      const kw = term.toLowerCase();
+      const score = (l: Listing) => (l.title.toLowerCase().startsWith(kw) ? 0 : l.title.toLowerCase().includes(kw) ? 1 : 2);
+      return available
+        .filter((l) => `${l.title} ${l.breed ?? ""} ${l.brand ?? ""} ${l.category}`.toLowerCase().includes(kw))
+        .sort((a, b) => score(a) - score(b))
+        .slice(0, 6)
+        .map((l) => ({
+          id: l.id,
+          title: l.title,
+          subtitle: `${inr(l.price)} · ${l.breed || l.category}${l.location ? ` · ${l.location}` : ""}`,
+          image: l.photos?.[0],
+          emoji: l.emoji,
+        }));
+    },
+    { delay: 120 },
+  );
+  const pickSuggestion = (s: Suggestion) => {
+    sg.hide();
+    Keyboard.dismiss();
+    open(s.id);
+  };
+  const runSearch = () => {
+    sg.hide();
+    Keyboard.dismiss();
+  };
+
   const featured = available.filter((l) => l.isFeatured);
   const recents = recent
     .map((id) => listings.find((l) => l.id === id))
@@ -327,6 +360,7 @@ export default function ResellScreen({ navigation }: any) {
       <FlatList
         ref={listRef}
         className="flex-1"
+        keyboardShouldPersistTaps="handled"
         data={pageItems}
         keyExtractor={(l) => l.id}
         numColumns={2}
@@ -441,7 +475,12 @@ export default function ResellScreen({ navigation }: any) {
             {/* search + filters */}
             <SearchBar
               value={q}
-              onChangeText={setQ}
+              onChangeText={(t) => {
+                setQ(t);
+                sg.show();
+              }}
+              onFocus={sg.show}
+              onSubmit={runSearch}
               onCamera={photoSearch}
               scanning={scanning}
               placeholder="Search pets, products, breeds…"
@@ -452,6 +491,9 @@ export default function ResellScreen({ navigation }: any) {
                 onPress: () => setFilterOpen(true),
               }}
             />
+            {sg.visible && (
+              <SuggestionDropdown label="Resell" items={sg.items} loading={false} query={q} onPick={pickSuggestion} onSeeAll={runSearch} />
+            )}
             {photo && <PhotoItemChips items={photo.items} activeTerm={photo.term} query={q} onPick={pickPhotoItem} />}
 
             {/* category chips */}
@@ -483,7 +525,7 @@ export default function ResellScreen({ navigation }: any) {
             )}
 
             {/* quick filters */}
-            <ScrollView
+            {/* <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               className="-mx-4 grow-0"
@@ -494,7 +536,7 @@ export default function ResellScreen({ navigation }: any) {
               <QuickChip icon="pricetag" label="Under ₹1,000" on={filters.max === "1000"} onPress={toggleUnder} />
               <QuickChip icon="sparkles" label="Like New" on={filters.condition === "Like New"} onPress={toggleLikeNew} />
               <QuickChip icon="calendar" label="Recently Added" on={recentOnly} onPress={() => setRecentOnly((v) => !v)} />
-            </ScrollView>
+            </ScrollView> */}
 
             {!browsing && (
               <Rail

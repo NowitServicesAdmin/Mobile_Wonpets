@@ -63,7 +63,7 @@ export const appointments: Appointment[] = [
 export type Product = {
   id: string; name: string; category: string; emoji: string; price: number; mrp: number; off: number; rating: number; reviews: number; source: string; stock: number; description: string;
   /** Set by the API mapper. */
-  image?: string; images?: string[]; itemType?: 'pet' | 'product'; categoryId?: string; storeManagerId?: string; breed?: string; badge?: string;
+  image?: string; images?: string[]; itemType?: 'pet' | 'product'; categoryId?: string; storeManagerId?: string; breed?: string; badge?: string; brand?: string;
 };
 export const products: Product[] = [
   { id: 'p1', name: 'Golden Retriever Dog Ag…', category: 'Pets', emoji: '🐕', price: 9200, mrp: 10000, off: 8, rating: 5.0, reviews: 1, source: 'Car pets', stock: 1, description: 'Healthy, vaccinated Golden Retriever.' },

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Image, View } from 'react-native';
+import { BrandWordmark } from '../../components/BrandLogo';
 
 export default function SplashScreen() {
   const scale = useRef(new Animated.Value(0.6)).current;
@@ -15,8 +16,9 @@ export default function SplashScreen() {
       <Animated.View style={{ transform: [{ scale }], opacity }}>
         <Image source={require('../../assets/logo.png')} style={{ width: 120, height: 120, borderRadius: 28 }} />
       </Animated.View>
-      <Animated.Text style={{ opacity }} className="text-white text-[28px] font-black mt-[18px] tracking-widest">WON PET PRO</Animated.Text>
-      <Animated.Text style={{ opacity }} className="text-orange-100 mt-1 text-sm">Love for Life ♥</Animated.Text>
+      <Animated.View style={{ opacity, marginTop: 18 }}>
+        <BrandWordmark variant="onOrange" size="xl" align="center" />
+      </Animated.View>
     </View>
   );
 }

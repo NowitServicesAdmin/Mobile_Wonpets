@@ -62,7 +62,7 @@ export default function DoctorProfileForm() {
   };
 
   const deleteAccount = async () => {
-    const r = await WonPetsAlert.delete('Delete your account?', 'This permanently deletes your account, schedule and records. This cannot be undone.', { confirmText: 'Delete account' });
+    const r = await WonPetsAlert.delete('Delete your account?', 'Your account will be deleted. If you change your mind, log in again within 90 days to restore everything. After 90 days your account, schedule and records are permanently removed.', { confirmText: 'Delete account' });
     if (!r.isConfirmed) return;
     setDeleting(true);
     try { await authService.deleteAccount(); await signOut(); }
@@ -118,7 +118,7 @@ export default function DoctorProfileForm() {
       <Button disabled={saving || deleting} title={saving ? 'Saving…' : 'Save Changes'} icon={<Ionicons name="checkmark-circle-outline" size={19} color="#fff" />} onPress={save} />
 
       <FormCard icon="warning-outline" title="Delete account" tone="red">
-        <Text className={T.body}>Permanently remove your account and all of its data, including your schedule, prescriptions and records. This can't be undone.</Text>
+        <Text className={T.body}>Delete your account. You can restore it by logging in within 90 days. After that, your account and all of its data, including your schedule, prescriptions and records, are permanently removed.</Text>
         <Pressable onPress={deleteAccount} disabled={deleting || saving} accessibilityRole="button" accessibilityLabel="Delete my account" className={cn('flex-row items-center justify-center gap-2 rounded-2xl py-3.5 border border-red/30 bg-red-soft active:opacity-80', (deleting || saving) && 'opacity-50')}>
           <Ionicons name="trash-outline" size={18} color={colors.red} />
           <Text className="text-red font-extrabold text-[15px]">{deleting ? 'Deleting…' : 'Delete my account'}</Text>
