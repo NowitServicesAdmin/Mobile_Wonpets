@@ -6,10 +6,10 @@ import { cn } from "../ui";
 import { Panel, PanelHeader } from "../doctor/DoctorUI";
 
 const quick = [
-  { label: "Book Appointment", icon: "calendar-outline", box: "bg-orange-100", fg: "#F97316", go: "BookAppointment" },
-  { label: "Buy Products", icon: "bag-handle-outline", box: "bg-purple-soft", fg: colors.purple, go: "Store" },
-  { label: "Resell Items", icon: "pricetag-outline", box: "bg-pink-soft", fg: colors.pink, go: "Resell" },
-  { label: "Chat with Vet", icon: "chatbubble-outline", box: "bg-green-soft", fg: colors.green, go: "Chat" },
+  { label: "Appointments", icon: "calendar-outline", box: "bg-orange-100", fg: "#F97316", go: "BookAppointment" },
+  { label: "Products", icon: "bag-handle-outline", box: "bg-purple-soft", fg: colors.purple, go: "Store" },
+  { label: "Resell", icon: "pricetag-outline", box: "bg-pink-soft", fg: colors.pink, go: "Resell" },
+  { label: "Chat", icon: "chatbubble-outline", box: "bg-green-soft", fg: colors.green, go: "Chat" },
 ] as const;
 
 type Props = { onGo: (screen: string) => void; onSupport: () => void };

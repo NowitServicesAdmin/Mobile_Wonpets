@@ -79,7 +79,7 @@ export default function PetHeroBanner({ userName, pets, stats, profileComplete =
       </View>
 
       {/* appointment stats */}
-      <View className="flex-row gap-1.5 mt-3">
+      {/* <View className="flex-row gap-1.5 mt-3">
         {tiles.map((t) => (
           <View key={t.k} className="flex-1 bg-white rounded-2xl border border-line px-1.5 py-2 items-center">
             <View className={`w-7 h-7 rounded-full items-center justify-center ${t.box}`}>
@@ -89,7 +89,7 @@ export default function PetHeroBanner({ userName, pets, stats, profileComplete =
             <Text maxFontSizeMultiplier={1.1} className="text-[10px] text-muted" numberOfLines={1}>{t.label}</Text>
           </View>
         ))}
-      </View>
+      </View> */}
     </Gradient>
   );
 }
