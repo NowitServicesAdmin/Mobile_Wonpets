@@ -5,30 +5,46 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+
+    "scheme": [
+      "wonpetpro",
+      "com.nowitservices.wonpetpro"
+    ],
+
     "icon": "./src/assets/icon.png",
+
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wonpet.pro",
+      "bundleIdentifier": "com.nowitservices.wonpetpro",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "WON PET PRO uses your camera so your vet can see you and your pet during video consultations.",
         "NSMicrophoneUsageDescription": "WON PET PRO uses your microphone so you can talk to your vet during video consultations."
       }
     },
+
     "android": {
-      "package": "com.wonpet.pro",
+      "package": "com.nowitservices.wonpetpro",
+
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/adaptive-icon.png",
         "backgroundColor": "#FEF7ED"
       },
+
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS"
+        "MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
+
     "plugins": [
       "expo-asset",
       "expo-font",
+      "expo-apple-authentication",
+
       [
         "expo-splash-screen",
         {
@@ -38,6 +54,7 @@
           "imageWidth": 200
         }
       ],
+
       [
         "expo-location",
         {
@@ -45,9 +62,11 @@
         }
       ]
     ],
-        "scheme": [
-      "wonpet",
-      "com.wonpet.pro"
-    ]
+
+    "extra": {
+      "eas": {
+        "projectId": "5986ec63-2a6f-400b-9bba-989363e4f918"
+      }
+    }
   }
 }

@@ -20,6 +20,23 @@ export type ApiUser = {
 };
 export type Session = { token: string; user: ApiUser; restored?: boolean };
 
+/** Returned for a Google e-mail with no account yet. Pass `signupToken` to `register` as `googleSignupToken`. */
+export type GoogleProfile = {
+  email: string;
+  name?: string;
+  picture?: string;
+  googleId: string;
+  signupToken: string;
+};
+
+/** Returned for an Apple ID with no account yet. Pass `signupToken` to `register` as `appleSignupToken`. */
+export type AppleProfile = {
+  email: string;
+  name?: string;
+  appleId: string;
+  signupToken: string;
+};
+
 /** The backend wants an e-mail in lower case or an E.164 phone number (+919876543210, no spaces). */
 export const normalizeIdentifier = (v: string) => {
   const t = v.trim();
@@ -43,17 +60,26 @@ export const authService = {
     return { token: data.token, user: data.user, restored: data.restored === true };
   },
 
+  /**
+   * Sign up with one of:
+   *  - `identifier` + `otp`
+   *  - `googleSignupToken` (= googleProfile.signupToken from `googleLogin`)
+   *  - `appleSignupToken`  (= appleProfile.signupToken from `appleLogin`)
+   * For the Google / Apple routes no identifier/otp is needed: the server
+   * takes the verified e-mail from the signed token.
+   */
   async register(p: {
     name: string;
-    identifier: string;
+    identifier?: string;
     otp?: string;
-    googleId?: string;
+    googleSignupToken?: string;
+    appleSignupToken?: string;
     role: ApiRole;
     profileImage?: string;
   }): Promise<Session> {
     const { data } = await api.post('/auth/register', {
       ...p,
-      identifier: normalizeIdentifier(p.identifier),
+      identifier: p.identifier ? normalizeIdentifier(p.identifier) : undefined,
       termsAccepted: true,
     });
     return { token: data.token, user: data.user };
@@ -64,7 +90,18 @@ export const authService = {
     const { data } = await api.post('/auth/google', { accessToken, ...(restore === true ? { restore: true } : {}) });
     return data as
       | { success: true; token: string; user: ApiUser; restored?: boolean; isNewUser?: undefined }
-      | { success: true; isNewUser: true; googleProfile: { email: string; name: string; picture?: string; googleId: string } };
+      | { success: true; isNewUser: true; googleProfile: GoogleProfile };
+  },
+
+  /** Existing account -> a session. Unknown Apple ID -> `isNewUser` + the Apple profile to prefill sign-up. */
+  async appleLogin(
+    p: { identityToken: string; email?: string; fullName?: string },
+    restore = false,
+  ) {
+    const { data } = await api.post('/auth/apple', { ...p, ...(restore === true ? { restore: true } : {}) });
+    return data as
+      | { success: true; token: string; user: ApiUser; restored?: boolean; isNewUser?: undefined }
+      | { success: true; isNewUser: true; appleProfile: AppleProfile };
   },
 
   async getProfile(): Promise<ApiUser> {

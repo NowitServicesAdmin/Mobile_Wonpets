@@ -6,7 +6,7 @@ import IdentifierField from "../../components/IdentifierField";
 import { COUNTRIES, parseIdentifier } from "../../utils/identifier";
 import { WonPetsAlert, toast } from "../../components/WonPetsAlert";
 import { useAuth } from "../../context/AuthContext";
-import { authService } from "../../services/auth.service";
+import { authService, type AppleProfile, type GoogleProfile } from "../../services/auth.service";
 import { errorMessage, type ApiError } from "../../services/api";
 import { PENDING_DELETION, askToRestore } from "../../utils/restoreAccount";
 import { toApiRole } from "../../services/mappers";
@@ -31,31 +31,37 @@ const roleIcon = (key: Role, color: string) =>
 
 export default function RegisterScreen({ navigation, route }: any) {
   const { startSession } = useAuth();
-  // set when the user came from "Continue with Google" and has no account yet
-  const google = route?.params?.google as { email: string; name: string; picture?: string; googleId: string } | undefined;
-  const [name, setName] = useState(google?.name ?? "");
+  // Set when the user came from "Continue with Google" / "Continue with Apple"
+  // and has no account yet. Each profile carries a signed `signupToken`.
+  const google = route?.params?.google as GoogleProfile | undefined;
+  const apple = route?.params?.apple as AppleProfile | undefined;
+  const social = google ?? apple;
+  const socialName = google ? "Google" : "Apple";
+
+  const [name, setName] = useState(social?.name ?? "");
   const [busy, setBusy] = useState(false);
-  const [value, setValue] = useState(google?.email ?? "");
+  const [value, setValue] = useState(social?.email ?? "");
   const [country, setCountry] = useState(COUNTRIES[0]);
   const [role, setRole] = useState<Role | null>(null);
   const [agree, setAgree] = useState(false);
 
   const parsed = parseIdentifier(value, country);
   const valid =
-    name.trim().length > 1 && (!!google || parsed.valid) && !!role && agree;
+    name.trim().length > 1 && (!!social || parsed.valid) && !!role && agree;
 
   const submit = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      if (google) {
-        // Google already verified the e-mail - no OTP step
+      if (social) {
+        // Google / Apple already verified the e-mail - no OTP step.
+        // The server takes the e-mail from the signed token, so only the token is sent.
         const session = await authService.register({
           name: name.trim(),
-          identifier: google.email,
-          googleId: google.googleId,
           role: toApiRole(role!),
-          profileImage: google.picture,
+          ...(google
+            ? { googleSignupToken: google.signupToken, profileImage: google.picture }
+            : { appleSignupToken: apple!.signupToken }),
         });
         if (role === "user") {
           const r = await startSession(session);
@@ -74,6 +80,13 @@ export default function RegisterScreen({ navigation, route }: any) {
         profile: { name: name.trim(), role: role! },
       });
     } catch (e) {
+      // The signed Google / Apple token only lasts 30 minutes.
+      const status = (e as any)?.status ?? (e as any)?.response?.status;
+      if (social && status === 401) {
+        toast.error(`Your ${socialName} sign-up expired. Please sign in with ${socialName} again.`);
+        navigation.navigate("Login");
+        return;
+      }
       if ((e as ApiError).code === PENDING_DELETION) {
         // this email / number belongs to an account deleted < 90 days ago: offer to restore it
         setBusy(false);
@@ -101,7 +114,11 @@ export default function RegisterScreen({ navigation, route }: any) {
     <AuthLayout
       lead="Create"
       accent="your account"
-      subtitle="Sign up to get started with Won Pet Pro"
+      subtitle={
+        social
+          ? `Almost done! Finish setting up your account with ${socialName}.`
+          : "Sign up to get started with Won Pet Pro"
+      }
       footer={
         <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center" }}>
           <Text style={{ color: AUTH.ink, fontSize: 15 }}>Already have an account? </Text>
@@ -119,8 +136,8 @@ export default function RegisterScreen({ navigation, route }: any) {
         placeholder="Enter your full name"
         autoCapitalize="words"
       />
-      {google ? (
-        <AuthField label="Email" icon="mail-outline" value={google.email} editable={false} />
+      {social ? (
+        <AuthField label="Email" icon="mail-outline" value={social.email} editable={false} />
       ) : (
         <IdentifierField
           value={value}
@@ -218,7 +235,7 @@ export default function RegisterScreen({ navigation, route }: any) {
       </Pressable>
 
       <GradientButton
-        title={busy ? "Please wait…" : google ? "Create account" : "Sign Up"}
+        title={busy ? "Please wait…" : social ? "Create account" : "Sign Up"}
         disabled={!valid || busy}
         onPress={submit}
       />

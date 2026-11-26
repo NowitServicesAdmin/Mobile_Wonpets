@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { AUTH, GradientButton, GoogleButton } from "../../components/auth/AuthUI";
+import React, { useEffect, useState } from "react";
+import { Platform, Pressable, Text, View } from "react-native";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { AUTH, GradientButton, GoogleButton, AppleButton } from "../../components/auth/AuthUI";
 import IdentifierField from "../../components/IdentifierField";
 import GoogleSignInButton, { googleConfigured } from "../../components/GoogleSignInButton";
 import { WonPetsAlert, toast } from "../../components/WonPetsAlert";
@@ -16,7 +17,16 @@ export default function LoginScreen({ navigation }: any) {
   const [value, setValue] = useState("");
   const [country, setCountry] = useState(COUNTRIES[0]);
   const [busy, setBusy] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const parsed = parseIdentifier(value, country);
+
+  // Only show "Continue with Apple" where the device can actually do it (iOS 13+).
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
 
   const sendOtp = async (restore = false) => {
     if (busy) return;
@@ -64,6 +74,55 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
+  const onApple = async (
+    restore = false,
+    saved?: AppleAuthentication.AppleAuthenticationCredential
+  ) => {
+    setBusy(true);
+    // Apple only returns name/email on the FIRST sign-in, so keep the credential
+    // for the "restore account" retry instead of opening the Apple sheet again.
+    let cred = saved;
+    try {
+      if (!cred) {
+        cred = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+      }
+      if (!cred.identityToken) throw new Error("Apple sign-in failed. Please try again.");
+
+      const res = await authService.appleLogin(
+        {
+          identityToken: cred.identityToken,
+          email: cred.email ?? undefined,
+          fullName: [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(" "),
+        },
+        restore === true
+      );
+      if (res.isNewUser) {
+        // no account yet -> continue to sign-up with the Apple details filled in
+        navigation.navigate("Register", { apple: res.appleProfile });
+        return;
+      }
+      const r = await startSession({ token: res.token, user: res.user });
+      if (!r.ok) WonPetsAlert.error("Can't sign in", r.message);
+      else if (res.restored) toast.success("Welcome back! Your account has been restored.");
+    } catch (e: any) {
+      if (e?.code === "ERR_REQUEST_CANCELED") return; // user dismissed the Apple sheet
+      if ((e as ApiError).code === PENDING_DELETION) {
+        setBusy(false);
+        const answer = await askToRestore(errorMessage(e));
+        if (answer.isConfirmed) await onApple(true, cred);
+        return;
+      }
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <AuthLayout
       large
@@ -96,6 +155,7 @@ export default function LoginScreen({ navigation }: any) {
       ) : (
         <GoogleButton onPress={() => toast.info("Google sign-in isn't configured yet. Add the EXPO_PUBLIC_GOOGLE_* ids in .env.")} />
       )}
+      {appleAvailable && <AppleButton onPress={() => onApple()} disabled={busy} />}
     </AuthLayout>
   );
 }

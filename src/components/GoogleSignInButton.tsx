@@ -1,53 +1,32 @@
-import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { GoogleButton } from './auth/AuthUI';
-import { toast } from './WonPetsAlert';
-import { GOOGLE } from '../config/env';
+import React, { useState } from "react";
+import { GoogleButton } from "./auth/AuthUI";
+import { toast } from "./WonPetsAlert";
+import { GOOGLE_WEB_CLIENT_ID, getGoogleAccessToken } from "../utils/googleBrowserAuth";
 
-WebBrowser.maybeCompleteAuthSession();
+export const googleConfigured = Boolean(GOOGLE_WEB_CLIENT_ID);
 
-/** The one client id this platform actually uses (expo-auth-session throws if it is empty, e.g. iOS with only a web id). */
-const clientIdForPlatform = Platform.select({ ios: GOOGLE.iosClientId, android: GOOGLE.androidClientId, default: GOOGLE.webClientId });
-export const googleConfigured = !!clientIdForPlatform;
-
-/** Expo Go cannot receive Google's redirect (its package id is host.exp.exponent) - a development / production build is needed. */
-const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
-/** Only render this when `googleConfigured` - the hook throws without a client id. */
-export default function GoogleSignInButton({ onToken, disabled }: { onToken: (accessToken: string) => void; disabled?: boolean }) {
-  const [request, response, prompt] = Google.useAuthRequest({
-    webClientId: GOOGLE.webClientId || undefined,
-    androidClientId: GOOGLE.androidClientId || undefined,
-    iosClientId: GOOGLE.iosClientId || undefined,
-  });
-
-  useEffect(() => {
-    if (!response) return;
-    if (response.type === 'success') {
-      const token = response.authentication?.accessToken || (response.params as any)?.access_token;
-      if (token) onToken(token);
-      else toast.error('Google did not return an access token. Please try again.');
-    } else if (response.type === 'error') {
-      // e.g. "Custom URI scheme is not enabled for your Android client" - means the OAuth client in Google Cloud is the wrong type
-      toast.error(response.error?.message || (response.params as any)?.error_description || 'Google sign-in failed. Please try again.');
-    }
-    // 'dismiss' / 'cancel' = the user closed the Google window: nothing to report
-  }, [response]);
+export default function GoogleSignInButton({
+  onToken,
+  disabled,
+}: {
+  onToken: (accessToken: string) => void;
+  disabled?: boolean;
+}) {
+  const [opening, setOpening] = useState(false);
 
   const start = async () => {
-    if (inExpoGo) {
-      toast.info('Google sign-in does not work inside Expo Go. Use a development build (npx expo run:android / eas build).');
-      return;
-    }
+    if (opening) return;
+    setOpening(true);
     try {
-      await prompt();
+      const token = await getGoogleAccessToken();
+      if (token) onToken(token);
     } catch (e: any) {
-      toast.error(e?.message || 'Could not open Google sign-in.');
+      if (__DEV__) console.log("[GOOGLE] Sign-in error:", e);
+      toast.error(e?.message || "Google sign-in failed. Please try again.");
+    } finally {
+      setOpening(false);
     }
   };
 
-  return <GoogleButton disabled={!request || disabled} onPress={start} />;
+  return <GoogleButton disabled={disabled || opening || !googleConfigured} onPress={start} />;
 }
