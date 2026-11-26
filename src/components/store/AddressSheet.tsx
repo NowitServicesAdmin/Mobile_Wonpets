@@ -61,7 +61,7 @@ export default function AddressSheet({ visible, address, onClose, onSave }: {
   const useCurrent = async () => {
     setSearching(true);
     try {
-      const c = await getCurrentCoords();
+      const c = await getCurrentCoords({ prompt: 'guided' });
       if (!c) return toast.error('Location permission is needed to use your current location.');
       applyPlace(await locationService.reverse(c.lat, c.lng));
     } catch (e) { toast.error(errorMessage(e)); }

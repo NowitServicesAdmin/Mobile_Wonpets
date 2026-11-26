@@ -1,12 +1,24 @@
 import * as Location from 'expo-location';
+import { askForPermission, ensurePermission } from './permissions';
 
 export type Coords = { lat: number; lng: number };
 
-/** Current position (asks for permission once). Returns null when denied / unavailable. */
-export async function getCurrentCoords(opts: { fresh?: boolean } = {}): Promise<Coords | null> {
+/** How getCurrentCoords deals with a location permission that is not given yet:
+ *  'none'   - only look, never ask (background refreshes)
+ *  'system' - ask with the system dialog while the OS still allows it (default)
+ *  'guided' - same, and when the OS has blocked it, offer to open the app's Settings (use for a tap on "use my location") */
+export type PermPrompt = 'none' | 'system' | 'guided';
+
+/** Current position. Asks for permission when needed (see PermPrompt). Returns null when denied / unavailable. */
+export async function getCurrentCoords(opts: { fresh?: boolean; prompt?: PermPrompt } = {}): Promise<Coords | null> {
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return null;
+    const prompt = opts.prompt ?? 'system';
+    const granted = prompt === 'guided'
+      ? await ensurePermission('location')
+      : prompt === 'system'
+        ? (await askForPermission('location')).granted
+        : (await Location.getForegroundPermissionsAsync()).granted;
+    if (!granted) return null;
     // `fresh` skips the cached fix - needed to notice that the user has travelled
     const last = opts.fresh ? null : await Location.getLastKnownPositionAsync();
     const pos = last ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));

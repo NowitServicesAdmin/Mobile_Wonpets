@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Button, Field, cn } from '../../components/ui';
-import { Photo } from '../../components/Avatar';
 import CustomDropdown from '../../components/CustomDropdown';
 import DateFields from '../../components/DateFields';
 import { FormSkeleton } from '../../components/Skeletons';
@@ -58,7 +57,6 @@ export default function SMOfferFormScreen({ navigation, route }: any) {
     })();
   }, [id]);
 
-  const accent = THEME_COLORS[f.theme] ?? THEME_COLORS.orange;
   const pickList = useMemo(() => {
     const k = pickSearch.trim().toLowerCase();
     return products.filter((p) => (!pickCat || p.categoryId === pickCat) && (!k || p.name.toLowerCase().includes(k)));
@@ -99,24 +97,10 @@ export default function SMOfferFormScreen({ navigation, route }: any) {
   };
 
   if (loading) return <View className="flex-1 bg-cream p-4"><FormCard icon="pricetag-outline" title="Offer"><FormSkeleton fields={6} /></FormCard></View>;
-  const previewImage = image[0] ?? offer?.productImage;
 
   return (
     <KeyboardAvoidingView className="flex-1 bg-cream" behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
-      <ScrollView contentContainerClassName="p-4 gap-4 pb-6" keyboardShouldPersistTaps="handled">
-        {/* live preview of the store banner */}
-        <View style={{ backgroundColor: accent }} className="rounded-3xl p-4 flex-row items-center gap-3 overflow-hidden">
-          <View className="flex-1 gap-1">
-            {!!f.highlight && <Text className="text-white/90 text-[11px] font-bold uppercase tracking-wider" numberOfLines={1}>{f.highlight}</Text>}
-            <Text className="text-white text-[18px] font-black" numberOfLines={2}>{f.offerText || (f.discount ? (f.discountType === 'Flat' ? `FLAT ₹${f.discount} OFF` : `${f.discount}% OFF`) : 'Your offer')}</Text>
-            <Text className="text-white/90 text-[12.5px]" numberOfLines={1}>{f.title || 'Offer title'}</Text>
-            <View className="flex-row items-center gap-2 mt-1.5">
-              <View className="bg-white rounded-full px-3 py-1.5"><Text style={{ color: accent }} className="font-extrabold text-[12px]">{f.buttonText || 'Shop Now'}</Text></View>
-              {!!f.code && <View className="border border-dashed border-white rounded-lg px-2 py-1"><Text className="text-white font-black text-[11px] tracking-wider">{f.code.toUpperCase()}</Text></View>}
-            </View>
-          </View>
-          {!!previewImage && <View className="w-[86px] h-[86px] rounded-2xl overflow-hidden bg-white/20"><Photo uri={previewImage} emojiSize={30} /></View>}
-        </View>
+      <ScrollView contentContainerClassName="p-3 gap-2.5 pb-4" keyboardShouldPersistTaps="handled">
         {!!offer && (
           <View className="flex-row items-center gap-2">
             <OfferBadge status={offer.status} />

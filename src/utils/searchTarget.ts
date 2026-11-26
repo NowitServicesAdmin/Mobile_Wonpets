@@ -88,7 +88,7 @@ function resolveStoreManager(path?: string): SearchTarget | null {
   const p = rawPath.replace(/\/+$/, '');
   const q = parseQuery(qs);
 
-  if (p === '/storemanager/management/orders') return q.orderId ? { name: 'SMOrderDetail', params: { id: q.orderId } } : smTab('SMOrders');
+  if (p === '/storemanager/management/orders') return q.orderId ? { name: 'SMOrderDetail', params: { id: q.orderId } } : { name: 'SMOrders' };
   if (p === '/storemanager/management/products') return q.productId ? { name: 'SMProductForm', params: { id: q.productId } } : { name: 'SMProducts' };
   if (p === '/storemanager/management/categories') return { name: 'SMCategories' };
   if (p === '/storemanager/management/inventory') return { name: 'SMInventory' };
@@ -97,7 +97,7 @@ function resolveStoreManager(path?: string): SearchTarget | null {
   if (p === '/storemanager/management/offers') return { name: 'SMOffers' };
   if (p === '/storemanager/management/reports') return { name: 'SMReports' };
   if (p === '/storemanager/management') return smTab('SMManage');
-  if (p === '/storemanager/earnings') return { name: 'SMEarnings' };
+  if (p === '/storemanager/earnings') return smTab('SMEarnings');
   if (p === '/storemanager/notifications') return { name: 'Notifications' };
   if (p === '/storemanager/settings') return smTab('SMProfile');
   if (p === '/storemanager/dashboard') return smTab('SMHome');

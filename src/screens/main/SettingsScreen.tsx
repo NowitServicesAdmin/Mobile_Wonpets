@@ -17,12 +17,14 @@ import { SwitchAccountCard } from '../../components/ProfileSwitcher';
 import InviteSection from '../../components/settings/InviteSection';
 import FaqSection from '../../components/settings/FaqSection';
 import ContactSection from '../../components/settings/ContactSection';
+import LegalSection from '../../components/settings/LegalSection';
+import { versionFooter } from '../../config/version';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { headerLocation } from '../../utils/location';
 import { FormSkeleton } from '../../components/Skeletons';
 
-type Key = 'profile' | 'subscription' | 'documents' | 'notifications' | 'collaborators' | 'shared' | 'invite' | 'faq' | 'support';
+type Key = 'profile' | 'subscription' | 'documents' | 'notifications' | 'collaborators' | 'shared' | 'invite' | 'faq' | 'support' | 'legal';
 // Additional Information and Language now live inside Profile - old deep links still land there
 const LEGACY: Record<string, Key> = { info: 'profile', language: 'profile' };
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -48,6 +50,7 @@ const sections: Record<Key, { title: string; hint: string; icon: IconName; tone:
   invite: { title: 'Invite', hint: 'Invite friends to WONPET', icon: 'person-add-outline', tone: 'orange', Body: InviteSection },
   faq: { title: 'Frequently Asked Questions', hint: 'Quick answers', icon: 'help-circle-outline', tone: 'purple', Body: FaqSection },
   support: { title: 'Contact & Support', hint: 'We are here to help', icon: 'headset-outline', tone: 'green', Body: ContactSection },
+  legal: { title: 'Terms & Policies', hint: 'Terms, privacy, refund & versions', icon: 'shield-checkmark-outline', tone: 'blue', Body: LegalSection },
 };
 
 const toKey = (k?: string): Key | null => (k ? (LEGACY[k] ?? (k in sections ? (k as Key) : null)) : null);
@@ -58,6 +61,7 @@ const groups: { id: string; title: string; items: Key[] }[] = [
   { id: 'prefs', title: 'Preferences', items: ['notifications'] },
   { id: 'sharing', title: 'Sharing', items: ['collaborators', 'shared', 'invite'] },
   { id: 'support', title: 'Help & Support', items: ['faq', 'support'] },
+  { id: 'legal', title: 'Legal', items: ['legal'] },
 ];
 
 // sections whose data comes from the settings API - they wait for the first load so their forms start with real values
@@ -215,7 +219,7 @@ export default function SettingsScreen({ route }: any) {
               <Ionicons name="log-out-outline" size={19} color={colors.red} />
               <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-red font-extrabold text-[15px]">Logout</Text>
             </Pressable>
-            <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-center text-xs text-muted">WON PET PRO · v1.1.0</Text>
+            <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-center text-xs text-muted">{versionFooter()}</Text>
           </>
         )}
       </ScrollView>

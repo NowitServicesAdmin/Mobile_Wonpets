@@ -7,23 +7,43 @@ import { colors } from '../../theme';
 import { cn } from '../ui';
 import { Photo } from '../Avatar';
 import { toast } from '../WonPetsAlert';
+import { ensurePermission } from '../../utils/permissions';
 import type { OfferStatus, SMOrderStatus, StockStatus } from '../../services/storeManager.service';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 /* ------------------------------- money ------------------------------- */
 export const inr0 = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-/** ₹2.48L / ₹1.2Cr / ₹12.5K for tight spots (same as the web Earnings page). */
+/** 2.50 -> "2.5", 12.00 -> "12" (no dangling zeros in short numbers). */
+const trim = (n: number, digits: number) => String(Number(n.toFixed(digits)));
+/**
+ * Short count: 9,850 stays exact; 12.5K / 2.48L / 1.2Cr from 10,000 up (Indian units, like the web Earnings page).
+ * Use it for tiles, legends and anything that has to fit a narrow box.
+ */
+export const numShort = (n: number) => {
+  const v = Number(n || 0);
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (a >= 1e7) return `${sign}${trim(a / 1e7, 2)}Cr`;
+  if (a >= 1e5) return `${sign}${trim(a / 1e5, 2)}L`;
+  if (a >= 1e4) return `${sign}${trim(a / 1e3, 1)}K`;
+  return v.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+};
+/** Short money: ₹9,850 stays exact; ₹12.5K / ₹2.48L / ₹1.2Cr from ₹10,000 up. Exact amounts (order totals, prices) use inr0. */
 export const inrShort = (n: number) => {
   const v = Number(n || 0);
-  if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
-  if (v >= 1e5) return `₹${(v / 1e5).toFixed(2)}L`;
-  if (v >= 1e3) return `₹${(v / 1e3).toFixed(1)}K`;
-  return `₹${Math.round(v)}`;
+  return v < 0 ? `-₹${numShort(Math.abs(v))}` : `₹${numShort(v)}`;
 };
 export const changeLabel = (c: number | null | undefined) => (c === null || c === undefined ? 'New' : `${c > 0 ? '+' : ''}${c}%`);
 export const changeColor = (c: number | null | undefined) => (c === null || c === undefined || c >= 0 ? colors.green : colors.red);
 export const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+/** "12 Mar" - for list rows where the year is just noise. */
+export const fmtDayMonth = (iso?: string) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const old = d.getFullYear() !== new Date().getFullYear(); // keep older dates unambiguous: "12 Mar 25"
+  return d.toLocaleDateString('en-IN', old ? { day: 'numeric', month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' });
+};
 
 /* ------------------------------- badges ------------------------------- */
 const PALETTE = {
@@ -47,7 +67,9 @@ export function Badge({ label, tone = 'slate', icon }: { label: string; tone?: P
   );
 }
 export const OrderBadge = ({ status }: { status: SMOrderStatus }) => <Badge label={status} tone={ORDER_COLOR[status] ?? 'slate'} />;
-export const StockBadge = ({ status }: { status: StockStatus }) => <Badge label={status} tone={STOCK_COLOR[status]} />;
+/** Short badge wording: In stock / Low / Sold out. */
+export const STOCK_SHORT: Record<StockStatus, string> = { 'In Stock': 'In stock', 'Low Stock': 'Low', 'Out Of Stock': 'Sold out' };
+export const StockBadge = ({ status }: { status: StockStatus }) => <Badge label={STOCK_SHORT[status]} tone={STOCK_COLOR[status]} />;
 export const OfferBadge = ({ status }: { status: OfferStatus }) => <Badge label={status} tone={OFFER_COLOR[status]} />;
 
 /* ------------------------------- charts ------------------------------- */
@@ -73,14 +95,14 @@ export function Donut({ data, size = 170, stroke = 22, centerValue, centerLabel 
           return seg;
         })}
       </Svg>
-      <Text className="text-[26px] font-black text-ink" numberOfLines={1} adjustsFontSizeToFit>{centerValue}</Text>
+      <Text className="text-[26px] font-black text-ink" numberOfLines={1} adjustsFontSizeToFit>{typeof centerValue === 'number' ? numShort(centerValue) : centerValue}</Text>
       <Text className="text-[11px] text-muted">{centerLabel}</Text>
     </View>
   );
 }
 
 /** Legend rows that go under a Donut. */
-export function Legend({ data, format = (n: number) => String(n) }: { data: { label: string; value: number; color: string }[]; format?: (n: number) => string }) {
+export function Legend({ data, format = numShort }: { data: { label: string; value: number; color: string }[]; format?: (n: number) => string }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   return (
     <View className="gap-2.5 mt-4">
@@ -89,7 +111,7 @@ export function Legend({ data, format = (n: number) => String(n) }: { data: { la
           <View style={{ backgroundColor: d.color }} className="w-3 h-3 rounded-full" />
           <Text className="flex-1 text-[13px] text-muted" numberOfLines={1}>{d.label}</Text>
           {total > 0 && <Text className="text-[11px] text-muted">{Math.round((d.value / total) * 100)}%</Text>}
-          <Text className="text-[13px] font-bold text-ink min-w-[44px] text-right">{format(d.value)}</Text>
+          <Text className="text-[13px] font-bold text-ink min-w-[44px] text-right" numberOfLines={1}>{format(d.value)}</Text>
         </View>
       ))}
     </View>
@@ -97,7 +119,7 @@ export function Legend({ data, format = (n: number) => String(n) }: { data: { la
 }
 
 /** Smooth area chart (sales / revenue trends). Measures its own width. */
-export function AreaChart({ data, height = 170, color = '#F97316', format = (n: number) => String(n), maxLabels = 7 }: {
+export function AreaChart({ data, height = 170, color = '#F97316', format = numShort, maxLabels = 7 }: {
   data: { label: string; value: number }[]; height?: number; color?: string; format?: (n: number) => string; maxLabels?: number;
 }) {
   const [w, setW] = useState(0);
@@ -228,8 +250,7 @@ export function ImagePickerGrid({ existing = [], picked, onChange, max = 4, labe
 }) {
   const showing = picked.length ? picked : existing;
   const add = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return toast.error('Allow photo access to add images.');
+    if (!(await ensurePermission('photos'))) return toast.error('Allow photo access to add images.');
     const left = max - picked.length;
     if (left <= 0) return toast.info(`You can add up to ${max} image${max > 1 ? 's' : ''}.`);
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsMultipleSelection: max > 1, selectionLimit: left, quality: 0.7 });
@@ -301,6 +322,99 @@ export function LoadError({ message, onRetry }: { message: string; onRetry: () =
       <Text className="text-[15px] font-extrabold text-ink">Couldn't load this page</Text>
       <Text className="text-[13px] text-muted text-center">{message}</Text>
       <Pressable onPress={onRetry} className="mt-2 px-5 py-2.5 rounded-2xl bg-primary active:opacity-80"><Text className="text-white font-bold">Try again</Text></Pressable>
+    </View>
+  );
+}
+
+/* ===================== compact layout (shared by every store-manager screen) ===================== */
+/** Tighter page padding / gaps than the owner app, so each screen needs far less scrolling. */
+export const SM_PAD = 'p-3 gap-2.5 pb-4';
+
+/** One-line page title (the web page heading + its subtitle) with an optional right-hand slot. */
+export function SMTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+  return (
+    <View className="flex-row items-center gap-2">
+      <View className="flex-1">
+        <Text maxFontSizeMultiplier={1.1} className="text-[19px] font-black text-primary leading-6" numberOfLines={1}>{title}</Text>
+        {!!subtitle && <Text maxFontSizeMultiplier={1.1} className="text-[11.5px] text-muted leading-4" numberOfLines={1}>{subtitle}</Text>}
+      </View>
+      {right}
+    </View>
+  );
+}
+
+export type SMStat = {
+  title: string; value: string | number; icon: IconName; bg: string; fg: string; caption?: string;
+  /** growth chip, e.g. { label: '+12%', up: true } */
+  chip?: { label: string; up: boolean };
+};
+
+/** Compact stat tiles: small round icon, label, big number. `cols` per row (2 or 3); an odd last tile stretches. */
+export function SMStatGrid({ stats, cols = 2 }: { stats: SMStat[]; cols?: 2 | 3 }) {
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {stats.map((s, i) => {
+        const lone = stats.length % cols === 1 && i === stats.length - 1;
+        const w = lone ? 'w-full' : cols === 3 ? 'w-[32%]' : 'w-[48.8%]';
+        return (
+          <View key={s.title} className={cn(w, 'flex-row items-center gap-2 bg-white rounded-2xl border border-line px-2.5 py-2')}>
+            <View style={{ backgroundColor: s.bg }} className="w-8 h-8 rounded-full items-center justify-center"><Ionicons name={s.icon} size={15} color={s.fg} /></View>
+            <View className="flex-1">
+              <Text maxFontSizeMultiplier={1.1} className="text-[10.5px] font-semibold text-muted" numberOfLines={1}>{s.title}</Text>
+              <Text maxFontSizeMultiplier={1.1} className="text-[17px] font-black text-ink leading-[21px]" numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
+              {!!s.caption && <Text maxFontSizeMultiplier={1.1} className="text-[10px] text-muted" numberOfLines={1}>{s.caption}</Text>}
+            </View>
+            {!!s.chip && (
+              <View style={{ backgroundColor: s.chip.up ? '#DCFCE7' : '#FEE2E2' }} className="rounded-full px-1.5 py-0.5">
+                <Text style={{ color: s.chip.up ? '#16A34A' : '#EF4444' }} className="text-[10px] font-bold">{s.chip.label}</Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Tints used by SMStat (same palette as the web stat cards). */
+export const SM_TINT = {
+  orange: { bg: '#FFEDD5', fg: '#F97316' }, green: { bg: '#DCFCE7', fg: '#22C55E' }, blue: { bg: '#DBEAFE', fg: '#3B82F6' },
+  purple: { bg: '#EDE9FE', fg: '#8B5CF6' }, red: { bg: '#FEE2E2', fg: '#EF4444' }, amber: { bg: '#FEF3C7', fg: '#F59E0B' },
+  pink: { bg: '#FCE7F3', fg: '#EC4899' }, slate: { bg: '#F1F5F9', fg: '#475569' },
+} as const;
+
+/** Small white card used for web "panels" (less padding than the shared Panel). */
+export function SMCard({ children, className }: { children?: React.ReactNode; className?: string }) {
+  return <View className={cn('bg-white rounded-2xl border border-line p-3', className)}>{children}</View>;
+}
+
+/** Card heading: bold title + optional caption and a right-hand action link. */
+export function SMCardHead({ title, caption, action, onAction, right }: { title: string; caption?: string; action?: string; onAction?: () => void; right?: React.ReactNode }) {
+  return (
+    <View className="flex-row items-center gap-2 mb-2">
+      <View className="flex-1">
+        <Text maxFontSizeMultiplier={1.1} className="text-[15px] font-extrabold text-ink" numberOfLines={1}>{title}</Text>
+        {!!caption && <Text maxFontSizeMultiplier={1.1} className="text-[11px] text-muted" numberOfLines={1}>{caption}</Text>}
+      </View>
+      {right}
+      {!!action && <Pressable onPress={onAction} hitSlop={6} accessibilityRole="button"><Text className="text-[12.5px] font-bold text-primary">{action} →</Text></Pressable>}
+    </View>
+  );
+}
+
+/** Pill tabs (All / Active / Inactive, Revenue / Orders …) in one row. */
+export function SMPills<K extends string>({ value, onChange, options }: { value: K; onChange: (k: K) => void; options: { key: K; label: string; count?: number }[] }) {
+  return (
+    <View className="flex-row gap-1.5">
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <Pressable key={o.key} onPress={() => onChange(o.key)} accessibilityRole="button" accessibilityState={{ selected: on }}
+            className={cn('flex-1 items-center rounded-full py-1.5 px-1 border', on ? 'bg-primary border-primary' : 'bg-white border-line')}>
+            <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className={cn('text-[12px] font-bold', on ? 'text-white' : 'text-ink')}>{o.label}{o.count !== undefined ? ` (${o.count})` : ''}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

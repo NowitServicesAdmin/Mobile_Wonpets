@@ -62,10 +62,14 @@ const productForm = (p: ProductInput, newImages: string[]) => {
 };
 
 /* =============================== categories =============================== */
-export type SMCategory = { id: string; name: string; description: string; type: 'pet' | 'product'; parent: string; products: number; subcategoryCount: number };
+export type SMCategory = { id: string; name: string; description: string; type: 'pet' | 'product'; parent: string; products: number; subcategoryCount: number; image?: string; isActive: boolean; createdAt?: string };
 const mapCategory = (c: any): SMCategory => ({
   id: idOf(c), name: c.name || '', description: c.description || '', type: c.type === 'pet' ? 'pet' : 'product',
   parent: c.parent ? idOf(c.parent) : '', products: num(c.productCount), subcategoryCount: num(c.subcategoryCount),
+  image: absUrl(typeof c.image === 'string' ? c.image : c.image?.url),
+  // same rule as the web page (isInactive)
+  isActive: !(c.isActive === false || String(c.status || '').toLowerCase() === 'inactive'),
+  createdAt: c.createdAt,
 });
 export type CategoryInput = { name: string; description: string; type: 'pet' | 'product'; parent: string };
 
@@ -181,6 +185,18 @@ export type SMDashboard = {
   lowStock: SMProduct[];
   offerStats: { total: number; active: number; scheduled: number; expired: number; usage: number };
   topOffers: SMOffer[];
+  /** % change vs the last 30 days; null / missing = nothing to compare against yet (same as the web). */
+  growth: Partial<Record<'revenue' | 'orders' | 'products' | 'customers' | 'lowStock', number | null>>;
+  trends: Partial<Record<'orders' | 'products' | 'customers' | 'lowStock', number[]>>;
+  subscription: { active: boolean; endedOn: string } | null;
+};
+export type SMPerformanceDays = 7 | 30 | 90;
+/** Last `days` days compared with the `days` days before them. growth null = nothing to compare against. */
+export type SMPerformance = {
+  days: number;
+  current: { revenue: number; orders: number; customers: number };
+  previous: { revenue: number; orders: number; customers: number };
+  growth: Record<'revenue' | 'orders' | 'customers', number | null>;
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export type Overview = { products: number; categories: number; inventory: number; orders: number; customers: number; reviews: number; offers: number };
@@ -244,7 +260,26 @@ export const smService = {
       lowStock: (low?.products || []).map(mapSMProduct),
       offerStats: { total: num(os?.totalOffers), active: num(os?.activeOffers), scheduled: num(os?.scheduledOffers), expired: num(os?.expiredOffers), usage: num(os?.totalUsage) },
       topOffers: (to?.offers || []).map(mapOffer),
+      growth: d?.growth || {},
+      trends: d?.trends || {},
+      subscription: d?.subscription ? { active: d.subscription.active !== false, endedOn: String(d.subscription.endedOn ?? '') } : null,
     };
+  },
+  /** Store Performance card: growth vs the previous period (7 / 30 / 90 days). */
+  async performance(days: SMPerformanceDays = 30): Promise<SMPerformance> {
+    const { data } = await api.get('/stores/performance', { params: { days } });
+    const p = data?.performance || {};
+    const m = (x: any) => ({ revenue: num(x?.revenue), orders: num(x?.orders), customers: num(x?.customers) });
+    const gr = (v: any) => (v === null || v === undefined ? null : num(v));
+    return {
+      days: num(p.days, days), current: m(p.current), previous: m(p.previous),
+      growth: { revenue: gr(p.growth?.revenue), orders: gr(p.growth?.orders), customers: gr(p.growth?.customers) },
+    };
+  },
+  /** Completed orders - the number on the web Management "Reports" card. */
+  async reportOrders(): Promise<number> {
+    const { data } = await api.get('/store-orders/report-summary');
+    return num(data?.summary?.orders);
   },
   async overview(): Promise<Overview> {
     const { data } = await api.get('/stores/management-overview');
@@ -284,8 +319,17 @@ export const smService = {
     const { data } = await api.get('/categories');
     return (data.categories || []).map(mapCategory);
   },
-  async createCategory(c: CategoryInput) {
-    const { data } = await api.post('/categories', { ...c, name: c.name.trim(), parent: c.type === 'pet' ? c.parent : '' });
+  async createCategory(c: CategoryInput, imageUri?: string) {
+    const body = { ...c, name: c.name.trim(), parent: c.type === 'pet' ? c.parent : '' };
+    if (!imageUri) {
+      const { data } = await api.post('/categories', body);
+      return data as { message?: string; category?: any };
+    }
+    // with a picture the web sends multipart form data (field "image")
+    const f = new FormData();
+    Object.entries(body).forEach(([k, v]) => f.append(k, String(v ?? '')));
+    f.append('image', fileFromUri(imageUri, 'category'));
+    const { data } = await api.post('/categories', f, multipart);
     return data as { message?: string; category?: any };
   },
   async updateCategory(id: string, c: CategoryInput) {

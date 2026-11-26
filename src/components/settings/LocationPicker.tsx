@@ -57,7 +57,7 @@ export default function LocationPicker({ value, onChange, label = 'Location', pl
   const useCurrent = async () => {
     setLocating(true);
     try {
-      const c = await getCurrentCoords();
+      const c = await getCurrentCoords({ prompt: 'guided' });
       if (!c) { WonPetsAlert.error('Location unavailable', 'Allow location access to use your current position.'); return; }
       const place = await locationService.reverse(c.lat, c.lng);
       if (!place) return;

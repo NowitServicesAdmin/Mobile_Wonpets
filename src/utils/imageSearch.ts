@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { VisualSearchResult, VisualSearchScope, sharedService } from '../services/shared.service';
 import { errorMessage } from '../services/api';
 import { toast } from '../components/WonPetsAlert';
+import { ensurePermission } from './permissions';
 
 type Source = 'camera' | 'gallery';
 
@@ -33,8 +34,8 @@ export async function searchByPhoto(scope: VisualSearchScope): Promise<VisualSea
     const from = await askSource();
     if (!from) return null;
 
-    const perm = from === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
+    // asks now if it was skipped at start; if the OS blocked it, offers to open Settings
+    if (!(await ensurePermission(from === 'camera' ? 'camera' : 'photos'))) {
       toast.error(from === 'camera' ? 'Camera permission is needed to take a photo.' : 'Photo access is needed to pick an image.');
       return null;
     }

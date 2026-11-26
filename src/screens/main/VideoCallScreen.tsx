@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePets } from '../../context/PetsContext';
 import { useAuth } from '../../context/AuthContext';
 import { JITSI_DOMAIN, jitsiRoomFor } from '../../config/env';
-import { hasCallPermissions, requestCallPermissions } from '../../utils/permissions';
+import { askForPermission } from '../../utils/permissions';
 
 type Phase = 'permissions' | 'connecting' | 'ready' | 'error';
 
@@ -89,14 +89,15 @@ export default function VideoCallScreen({ route, navigation }: any) {
   const [dbg, setDbg] = useState<Record<string, string>>({});
   const note = (k: string, v: string) => setDbg((d) => ({ ...d, [k]: v }));
 
-  // Permissions are normally asked at app start (next to location). This only prompts if they were skipped or denied.
+  // Permissions are normally asked at app start (next to location). If they were skipped or denied there, they are asked again
+  // here, when the call needs them. Only when the OS will not show the dialog any more do we send the user to Settings.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const ok = (await hasCallPermissions()) || (await requestCallPermissions());
+      const r = await askForPermission('call');
       if (cancelled) return;
-      if (ok) setPhase('connecting');
-      else { setBlocked(true); setError('Camera and microphone access is needed for the video consultation. Please allow it in Settings and try again.'); setPhase('error'); }
+      if (r.granted) setPhase('connecting');
+      else { setBlocked(r.blocked); setError(r.blocked ? 'Camera and microphone access is needed for the video consultation. Please allow it in Settings and try again.' : 'Camera and microphone access is needed for the video consultation. Tap Try again and choose Allow.'); setPhase('error'); }
     })();
     return () => { cancelled = true; };
   }, []);

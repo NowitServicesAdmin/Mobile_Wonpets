@@ -106,7 +106,7 @@ export default function SMProductFormScreen({ navigation, route }: any) {
 
   return (
     <KeyboardAvoidingView className="flex-1 bg-cream" behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
-      <ScrollView contentContainerClassName="p-4 gap-4 pb-6" keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerClassName="p-3 gap-2.5 pb-4" keyboardShouldPersistTaps="handled">
         <FormCard icon="information-circle-outline" title="Basic details">
           <ChoiceRow label="Item type" value={f.itemType} onChange={(itemType) => set({ itemType })}
             options={[{ key: 'product', label: 'Product', icon: 'cube-outline' }, { key: 'pet', label: 'Pet', icon: 'paw-outline' }]} />

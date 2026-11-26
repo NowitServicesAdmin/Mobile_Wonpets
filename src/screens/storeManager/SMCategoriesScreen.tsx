@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Button, Empty, Field, cn } from '../../components/ui';
@@ -8,8 +9,8 @@ import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
 import SearchBar from '../../components/common/SearchBar';
 import BottomSheet from '../../components/common/BottomSheet';
 import CustomDropdown from '../../components/CustomDropdown';
-import { PageHeader, TONES, WebStatGrid, DTone } from '../../components/doctor/DoctorUI';
-import { Badge, ChoiceRow, Fab, FieldLabel, LoadError, RowAction } from '../../components/storeManager/SMUI';
+import { TONES, DTone } from '../../components/doctor/DoctorUI';
+import { Badge, ChoiceRow, FieldLabel, LoadError, RowAction, SMPills, SMStat, SMStatGrid, SM_PAD, SM_TINT, fmtDate, numShort } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { errorMessage } from '../../services/api';
 import { CategoryInput, SMCategory, smService } from '../../services/storeManager.service';
@@ -21,6 +22,10 @@ const ICONS: Record<string, [Icon, DTone]> = {
   grooming: ['cut', 'blue'], 'health care': ['medkit', 'green'], dogs: ['paw', 'amber'], cats: ['paw', 'pink'], birds: ['leaf', 'amber'], fish: ['water', 'blue'], pets: ['paw', 'orange'],
 };
 const iconFor = (name: string): [Icon, DTone] => ICONS[name.trim().toLowerCase()] ?? ['grid', 'orange'];
+type Tab = 'all' | 'active' | 'inactive';
+type Sort = 'az' | 'za' | 'newest' | 'oldest' | 'products';
+/** Same sort options as the web select. */
+const SORTS = [{ value: 'az', label: 'A to Z' }, { value: 'za', label: 'Z to A' }, { value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }, { value: 'products', label: 'Most Products' }];
 const blank: CategoryInput = { name: '', description: '', type: 'product', parent: '' };
 
 /** Categories (web CategoriesPage): main categories with their pet subcategories, add / edit / delete, open a category's products. */
@@ -32,6 +37,9 @@ export default function SMCategoriesScreen({ navigation }: any) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CategoryInput>(blank);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<Tab>('all');
+  const [sort, setSort] = useState<Sort>('az');
+  const [image, setImage] = useState<string | undefined>();
 
   const all = q.data ?? [];
   const mains = all.filter((c) => !c.parent);
@@ -39,16 +47,32 @@ export default function SMCategoriesScreen({ navigation }: any) {
   const subsOf = (cid: string) => all.filter((c) => c.parent === cid);
   const parentName = (c: SMCategory) => all.find((x) => x.id === c.parent)?.name;
   // no search: main categories (subcategories show inside them); searching: everything
-  const list = useMemo(() => (search.trim() ? all.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase())) : mains), [all, mains, search]);
+  const searched = useMemo(() => (search.trim() ? all.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase())) : mains), [all, mains, search]);
+  const list = useMemo(() => {
+    const t = (c: SMCategory) => new Date(c.createdAt || 0).getTime();
+    const by: Record<Sort, (a: SMCategory, b: SMCategory) => number> = {
+      az: (a, b) => a.name.localeCompare(b.name), za: (a, b) => b.name.localeCompare(a.name),
+      newest: (a, b) => t(b) - t(a), oldest: (a, b) => t(a) - t(b), products: (a, b) => b.products - a.products,
+    };
+    return searched.filter((c) => (tab === 'all' ? true : tab === 'active' ? c.isActive : !c.isActive)).sort(by[sort]);
+  }, [searched, tab, sort]);
+  const activeCount = all.filter((c) => c.isActive).length;
 
-  const startAdd = (parent = '') => { setEditing(null); setForm({ ...blank, type: parent ? 'pet' : 'product', parent }); setOpen(true); };
-  const startEdit = (c: SMCategory) => { setEditing(c); setForm({ name: c.name, description: c.description, type: c.type, parent: c.parent }); setOpen(true); };
+  const pickImage = async () => {
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (r.canceled) return;
+    const a = r.assets[0];
+    if (a.mimeType && !['image/png', 'image/jpeg'].includes(a.mimeType)) return toast.error('Only PNG or JPG images are allowed');
+    setImage(a.uri);
+  };
+  const startAdd = (parent = '') => { setEditing(null); setImage(undefined); setForm({ ...blank, type: parent ? 'pet' : 'product', parent }); setOpen(true); };
+  const startEdit = (c: SMCategory) => { setEditing(c); setImage(undefined); setForm({ name: c.name, description: c.description, type: c.type, parent: c.parent }); setOpen(true); };
 
   const save = async () => {
     if (!form.name.trim()) return toast.error('Category name is required');
     setSaving(true);
     try {
-      const res = editing ? await smService.updateCategory(editing.id, form) : await smService.createCategory(form);
+      const res = editing ? await smService.updateCategory(editing.id, form) : await smService.createCategory(form, image);
       toast.success(res.message || (editing ? 'Category updated' : 'Category created'));
       setOpen(false);
       q.reloadQuiet();
@@ -66,11 +90,11 @@ export default function SMCategoriesScreen({ navigation }: any) {
 
   const totalProducts = mains.reduce((s, c) => s + c.products, 0);
   const popular = [...mains].sort((a, b) => b.products - a.products)[0];
-  const stats: { label: string; value: string | number; icon: Icon; tone: DTone }[] = [
-    { label: 'Categories', value: all.length, icon: 'grid', tone: 'purple' },
-    { label: 'Products', value: totalProducts, icon: 'cube', tone: 'orange' },
-    { label: 'Pet categories', value: all.filter((c) => c.type === 'pet').length, icon: 'paw', tone: 'amber' },
-    { label: 'Most popular', value: popular?.products ? popular.name : '—', icon: 'star', tone: 'green' },
+  const stats: SMStat[] = [
+    { title: 'Total Categories', value: numShort(all.length), icon: 'grid', ...SM_TINT.purple },
+    { title: 'Total Products', value: numShort(totalProducts), icon: 'cube', ...SM_TINT.orange },
+    { title: 'Most Popular', value: popular?.products ? popular.name : '—', icon: 'star', ...SM_TINT.amber },
+    { title: 'Active Categories', value: numShort(activeCount), icon: 'checkmark-circle', ...SM_TINT.green },
   ];
   const lockType = !!editing && (!!editing.parent || editing.subcategoryCount > 0 || subsOf(editing.id).length > 0);
   const parentOptions = [{ value: '', label: 'None (main pet category)' }, ...petMains.filter((c) => c.id !== editing?.id).map((c) => ({ value: c.id, label: `Subcategory of ${c.name}` }))];
@@ -78,13 +102,22 @@ export default function SMCategoriesScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-cream">
       <FlatList
-        data={list} keyExtractor={(c) => c.id} contentContainerClassName="p-4 gap-3 pb-28"
+        data={list} keyExtractor={(c) => c.id} contentContainerClassName={SM_PAD}
         refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}
         ListHeaderComponent={
-          <View className="gap-3.5 mb-1">
-            <PageHeader icon="grid" title="Categories" subtitle="Organise your products and pets." />
-            <WebStatGrid stats={stats.map((x) => ({ title: x.label, value: x.value, icon: x.icon, tone: x.tone }))} />
-            <SearchBar value={search} onChangeText={setSearch} placeholder="Search categories…" />
+          <View className="gap-2.5 mb-0.5">
+            <Text className="text-[11.5px] text-muted -mb-1">Organize your products and pets</Text>
+            <SMStatGrid stats={stats} />
+            <SMPills value={tab} onChange={setTab} options={[{ key: 'all', label: 'All Categories', count: all.length }, { key: 'active', label: 'Active', count: activeCount }, { key: 'inactive', label: 'Inactive', count: all.length - activeCount }]} />
+            <View className="flex-row gap-2">
+              <View className="flex-1"><SearchBar value={search} onChangeText={setSearch} placeholder="Search categories..." /></View>
+            </View>
+            <View className="flex-row items-center gap-2">
+              <View className="flex-1"><CustomDropdown value={sort} onChange={(v) => setSort(v as Sort)} options={SORTS} searchable={false} title="Sort by" placeholder="A to Z" /></View>
+              <Pressable onPress={() => startAdd()} accessibilityRole="button" accessibilityLabel="Add Category" className="flex-row items-center gap-1.5 bg-primary rounded-xl px-3.5 h-11 active:opacity-80">
+                <Ionicons name="add" size={18} color="#fff" /><Text className="text-white font-extrabold text-[13px]">Add Category</Text>
+              </Pressable>
+            </View>
           </View>
         }
         ListEmptyComponent={<Empty emoji="🗂️" title={all.length ? 'No matching categories' : 'No categories yet'} body={all.length ? 'Try another name.' : 'Create categories to organise your products and pets.'} />}
@@ -93,27 +126,28 @@ export default function SMCategoriesScreen({ navigation }: any) {
           const subs = !c.parent && c.type === 'pet' ? subsOf(c.id) : [];
           return (
             <Pressable onPress={() => navigation.navigate('SMProducts', { category: c.id, categoryName: c.name })} accessibilityRole="button" accessibilityLabel={c.name}
-              className="bg-white rounded-3xl border border-line p-3.5 active:bg-primary-soft">
-              <View className="flex-row items-center gap-3">
-                <View className={cn('w-12 h-12 rounded-full items-center justify-center', TONES[tone].soft)}><Ionicons name={icon} size={22} color={TONES[tone].fg} /></View>
+              className="bg-white rounded-2xl border border-line p-3 active:bg-primary-soft">
+              <View className="flex-row items-center gap-2.5">
+                {c.image ? <Image source={{ uri: c.image }} className="w-11 h-11 rounded-xl" /> : <View className={cn('w-11 h-11 rounded-full items-center justify-center', TONES[tone].soft)}><Ionicons name={icon} size={20} color={TONES[tone].fg} /></View>}
                 <View className="flex-1">
                   <Text className="text-[15px] font-extrabold text-ink" numberOfLines={1}>{c.name}</Text>
                   <View className="flex-row items-center gap-1.5 mt-1">
                     <Badge label={c.type === 'pet' ? 'Pet' : 'Product'} tone={c.type === 'pet' ? 'amber' : 'blue'} />
-                    <Text className="text-[11.5px] text-muted">{c.products} product{c.products === 1 ? '' : 's'}</Text>
+                    <Badge label={c.isActive ? 'Active' : 'Inactive'} tone={c.isActive ? 'green' : 'slate'} />
+                    <Text className="text-[11.5px] text-muted">{numShort(c.products)} product{c.products === 1 ? '' : 's'} · {fmtDate(c.createdAt)}</Text>
                   </View>
                 </View>
                 <RowAction icon="create-outline" tone="blue" label={`Edit ${c.name}`} onPress={() => startEdit(c)} />
                 <RowAction icon="trash-outline" tone="red" label={`Delete ${c.name}`} onPress={() => remove(c)} />
               </View>
-              {!!c.description && <Text className="text-[12.5px] text-muted mt-2" numberOfLines={2}>{c.description}</Text>}
+              {!!c.description && <Text className="text-[12px] text-muted mt-1.5" numberOfLines={2}>{c.description}</Text>}
               {!!c.parent && <Text className="text-[11.5px] text-orange-600 font-semibold mt-2">Subcategory of {parentName(c)}</Text>}
               {!c.parent && c.type === 'pet' && (
-                <View className="flex-row flex-wrap gap-1.5 mt-2.5">
+                <View className="flex-row flex-wrap gap-1.5 mt-2">
                   {subs.map((s) => (
                     <Pressable key={s.id} onPress={() => navigation.navigate('SMProducts', { category: s.id, categoryName: s.name })} onLongPress={() => startEdit(s)}
                       className="px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 active:opacity-70">
-                      <Text className="text-[11.5px] font-semibold text-orange-700">{s.name} · {s.products}</Text>
+                      <Text className="text-[11.5px] font-semibold text-orange-700">{s.name} · {numShort(s.products)}</Text>
                     </Pressable>
                   ))}
                   <Pressable onPress={() => startAdd(c.id)} className="flex-row items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-orange-300 active:opacity-70">
@@ -125,8 +159,7 @@ export default function SMCategoriesScreen({ navigation }: any) {
           );
         }}
       />
-      <Fab label="Add Category" onPress={() => startAdd()} />
-
+      
       <BottomSheet visible={open} onClose={() => setOpen(false)} title={editing ? 'Edit Category' : form.parent ? 'New Subcategory' : 'New Category'}
         subtitle={editing ? editing.name : 'Organise products and pets'}
         footer={<Button disabled={saving} title={saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Category'} onPress={save} />}>
@@ -141,6 +174,16 @@ export default function SMCategoriesScreen({ navigation }: any) {
             <CustomDropdown value={form.parent} onChange={(parent) => setForm((x) => ({ ...x, parent }))} options={parentOptions} searchable={false}
               disabled={!!editing && subsOf(editing.id).length > 0} placeholder="None (main pet category)" title="Parent category" />
             <Text className="text-[11.5px] text-muted mt-1">Only pet categories can have subcategories (e.g. Pets › Dogs).</Text>
+          </View>
+        )}
+        {!editing && (
+          <View>
+            <FieldLabel>Category image (optional)</FieldLabel>
+            <Pressable onPress={pickImage} accessibilityRole="button" className="flex-row items-center gap-3 rounded-2xl border border-dashed border-orange-300 bg-orange-50 p-2.5 active:opacity-80">
+              {image ? <Image source={{ uri: image }} className="w-12 h-12 rounded-xl" /> : <View className="w-12 h-12 rounded-xl bg-orange-100 items-center justify-center"><Ionicons name="image-outline" size={22} color="#EA580C" /></View>}
+              <Text className="flex-1 text-[13px] font-semibold text-ink">{image ? 'Change image' : 'Add Category Image'}</Text>
+              {!!image && <Pressable onPress={() => setImage(undefined)} hitSlop={8}><Ionicons name="close-circle" size={20} color="#CDBFB0" /></Pressable>}
+            </Pressable>
           </View>
         )}
         <Field label="Description" value={form.description} onChangeText={(description) => setForm((x) => ({ ...x, description }))} placeholder="Short description (optional)"

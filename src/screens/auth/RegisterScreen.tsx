@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { AUTH, AuthField, GradientButton } from "../../components/auth/AuthUI";
 import IdentifierField from "../../components/IdentifierField";
@@ -10,6 +10,7 @@ import { authService } from "../../services/auth.service";
 import { errorMessage, type ApiError } from "../../services/api";
 import { PENDING_DELETION, askToRestore } from "../../utils/restoreAccount";
 import { toApiRole } from "../../services/mappers";
+import { recordLegalAcceptance } from "../../utils/legalAcceptance";
 import AuthLayout from "./AuthLayout";
 
 type Role = "user" | "store_manager" | "doctor";
@@ -57,6 +58,7 @@ export default function RegisterScreen({ navigation, route }: any) {
           role: toApiRole(role!),
           profileImage: google.picture,
         });
+        await recordLegalAcceptance(); // which Terms / Privacy / Refund versions they agreed to
         if (role === "user") {
           const r = await startSession(session);
           if (!r.ok) WonPetsAlert.error("Can't sign in", r.message);
@@ -67,6 +69,7 @@ export default function RegisterScreen({ navigation, route }: any) {
         return;
       }
       await authService.sendOtp(parsed.value, "signup"); // fails if the account already exists
+      await recordLegalAcceptance(); // which Terms / Privacy / Refund versions they agreed to
       navigation.navigate("Otp", {
         identifier: parsed.value,
         kind: parsed.kind,
@@ -205,14 +208,23 @@ export default function RegisterScreen({ navigation, route }: any) {
           I agree to the{" "}
           <Text
             style={{ color: AUTH.orange, fontWeight: "800" }}
-            onPress={() =>
-              Alert.alert(
-                "Terms & Conditions",
-                "Link your Terms & Conditions page here.",
-              )
-            }
+            onPress={() => navigation.navigate("Legal", { doc: "terms" })}
           >
             Terms & Conditions
+          </Text>
+          ,{" "}
+          <Text
+            style={{ color: AUTH.orange, fontWeight: "800" }}
+            onPress={() => navigation.navigate("Legal", { doc: "privacy" })}
+          >
+            Privacy Policy
+          </Text>
+          {" "}and{" "}
+          <Text
+            style={{ color: AUTH.orange, fontWeight: "800" }}
+            onPress={() => navigation.navigate("Legal", { doc: "refund" })}
+          >
+            Refund Policy
           </Text>
         </Text>
       </Pressable>

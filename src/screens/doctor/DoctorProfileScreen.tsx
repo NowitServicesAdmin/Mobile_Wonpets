@@ -18,6 +18,8 @@ import NotificationsSection from '../../components/settings/NotificationsSection
 import LanguageSection from '../../components/settings/LanguageSection';
 import FaqSection from '../../components/settings/FaqSection';
 import ContactSection from '../../components/settings/ContactSection';
+import LegalSection from '../../components/settings/LegalSection';
+import { versionFooter } from '../../config/version';
 import SharedWithMeSection from '../../components/settings/SharedWithMeSection';
 import SubscriptionSection from '../../components/settings/SubscriptionSection';
 import { SwitchAccountCard } from '../../components/ProfileSwitcher';
@@ -31,7 +33,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { headerLocation } from '../../utils/location';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Key = 'profile' | 'clinic' | 'kyc' | 'subscription' | 'documents' | 'prefs' | 'shared' | 'language' | 'faq' | 'support';
+type Key = 'profile' | 'clinic' | 'kyc' | 'subscription' | 'documents' | 'prefs' | 'shared' | 'language' | 'faq' | 'support' | 'legal';
 
 const DocumentsBody = () => <DocumentsSection types={DOCTOR_DOCUMENT_TYPES} />;
 const sections: Record<Key, { title: string; icon: IconName; Body: React.ComponentType<any> }> = {
@@ -45,6 +47,7 @@ const sections: Record<Key, { title: string; icon: IconName; Body: React.Compone
   language: { title: 'Language', icon: 'language-outline', Body: LanguageSection },
   faq: { title: 'Frequently Asked Questions', icon: 'help-circle-outline', Body: FaqSection },
   support: { title: 'Contact & Support', icon: 'headset-outline', Body: ContactSection },
+  legal: { title: 'Terms & Policies', icon: 'shield-checkmark-outline', Body: LegalSection },
 };
 const toKey = (k?: string): Key | null => (k && k in sections ? (k as Key) : null);
 
@@ -84,6 +87,7 @@ const SHARING: Item[] = [page('shared', 'Pets owners shared with you', 'pink')];
 const HELP: Item[] = [
   page('faq', 'Quick answers', 'purple'),
   page('support', 'We are here to help', 'green'),
+  page('legal', 'Terms, privacy, refund & versions', 'blue'),
 ];
 
 /** Profile tab. Same layout as the owner's Profile: a profile card on top (tap to edit), grouped rows below, every row opens as its own
@@ -274,7 +278,7 @@ export default function DoctorProfileScreen({ navigation, route }: any) {
               <Ionicons name="log-out-outline" size={19} color={colors.red} />
               <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-red font-extrabold text-[15px]">Logout</Text>
             </Pressable>
-            <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-center text-xs text-muted">WON PET PRO · v1.1.0</Text>
+            <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-center text-xs text-muted">{versionFooter()}</Text>
           </>
         )}
       </ScrollView>
