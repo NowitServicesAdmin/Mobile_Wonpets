@@ -45,9 +45,9 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
 
   return (
     <View className="flex-1 bg-cream">
-      <ScrollView contentContainerClassName="p-4 gap-4 pb-8" refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}>
+      <ScrollView contentContainerClassName="p-3 gap-2.5 pb-4" refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}>
         {/* header + progress */}
-        <Panel>
+        <Panel compact>
           <View className="flex-row items-center gap-2">
             <View className="flex-1">
               <Text className="text-[18px] font-black text-ink" numberOfLines={1}>{o.orderId}</Text>
@@ -80,8 +80,8 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
         </Panel>
 
         {/* customer */}
-        <Panel>
-          <PanelHeader icon="person" tone="blue" title="Customer" />
+        <Panel compact>
+          <PanelHeader compact icon="person" tone="blue" title="Customer" />
           <View className="flex-row items-center gap-3">
             <Avatar image={o.customer.image} emoji="🧑" size={46} />
             <View className="flex-1">
@@ -95,8 +95,8 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
         </Panel>
 
         {/* items */}
-        <Panel>
-          <PanelHeader icon="bag-handle" title="Ordered Products" caption={`${o.items.reduce((s, i) => s + i.qty, 0)} unit(s)`} />
+        <Panel compact>
+          <PanelHeader compact icon="bag-handle" title="Ordered Products" caption={`${o.items.reduce((s, i) => s + i.qty, 0)} unit(s)`} />
           <View className="gap-2.5">
             {o.items.map((i) => (
               <View key={i.id} className="flex-row gap-3 border border-line rounded-2xl p-2.5">
@@ -112,8 +112,8 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
         </Panel>
 
         {/* payment */}
-        <Panel>
-          <PanelHeader icon="card" tone="green" title="Payment Summary" />
+        <Panel compact>
+          <PanelHeader compact icon="card" tone="green" title="Payment Summary" />
           <View className="gap-2">
             <Row k="Subtotal" v={inr0(o.subtotal)} />
             {o.deliveryCharge > 0 && <Row k="Delivery" v={inr0(o.deliveryCharge)} />}
@@ -132,8 +132,8 @@ export default function SMOrderDetailScreen({ navigation, route }: any) {
 
         {/* address */}
         {!!o.address && (
-          <Panel>
-            <PanelHeader icon="location" tone="red" title="Shipping Address" />
+          <Panel compact>
+            <PanelHeader compact icon="location" tone="red" title="Shipping Address" />
             <Text className="font-bold text-ink">{o.address.fullName}</Text>
             <Text className="text-[13px] text-muted leading-5 mt-1">{[o.address.doorNo, o.address.formattedAddress].filter(Boolean).join(', ')}</Text>
             {!!o.address.landmark && <Text className="text-xs text-muted mt-0.5">Near {o.address.landmark}</Text>}
@@ -180,8 +180,8 @@ function ShipmentPanel({ o, onChanged, onFixAddress }: { o: SMOrder; onChanged: 
 
   if (s.mode !== 'shiprocket') {
     return (
-      <Panel>
-        <PanelHeader icon="car" title="Delivery" caption="You deliver this order yourself" />
+      <Panel compact>
+        <PanelHeader compact icon="car" title="Delivery" caption="You deliver this order yourself" />
         <Text className="text-[13px] text-muted leading-5">Mark it <Text className="font-bold">Shipped</Text> when it leaves and <Text className="font-bold">Delivered</Text> once the customer has it.</Text>
         {s.distanceKm != null && (
           <Text className="text-[13px] text-muted leading-5 mt-2">Customer is about <Text className="font-bold">{s.distanceKm} km</Text> from your store and paid <Text className="font-bold">{inr0(o.shippingCharge)}</Text> delivery for this order.</Text>
@@ -226,8 +226,8 @@ function ShipmentPanel({ o, onChanged, onFixAddress }: { o: SMOrder; onChanged: 
   };
 
   return (
-    <Panel>
-      <PanelHeader icon="car" title="Courier Shipment" />
+    <Panel compact>
+      <PanelHeader compact icon="car" title="Courier Shipment" />
       {s.sandbox && <View className="-mt-2 mb-2"><Badge label="TEST MODE" tone="purple" /></View>}
       <View className="gap-2">
         <View className="flex-row justify-between gap-3"><Text className="text-muted">Status</Text><Text className={cn('font-bold', problem ? 'text-red-600' : 'text-ink')}>{SHIP_TEXT[status] || status}</Text></View>

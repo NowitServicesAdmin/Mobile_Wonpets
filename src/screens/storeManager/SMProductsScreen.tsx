@@ -7,12 +7,11 @@ import { Avatar, Photo } from '../../components/Avatar';
 import { WishlistSkeleton } from '../../components/Skeletons';
 import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
 import SearchBar from '../../components/common/SearchBar';
-import FilterChips from '../../components/common/FilterChips';
+import CustomDropdown from '../../components/CustomDropdown';
 import BottomSheet from '../../components/common/BottomSheet';
 import InfoGrid from '../../components/common/InfoField';
 import LoadMoreFooter from '../../components/LoadMoreFooter';
-import { PageHeader, WebStatGrid, DTone } from '../../components/doctor/DoctorUI';
-import { Badge, Fab, LoadError, RowAction, StockBadge, inr0 } from '../../components/storeManager/SMUI';
+import { Badge, LoadError, RowAction, SMStat, SMStatGrid, SM_PAD, SM_TINT, StockBadge, inr0, numShort } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { useInfiniteSlice } from '../../hooks/useInfiniteSlice';
 import { errorMessage } from '../../services/api';
@@ -30,34 +29,29 @@ const SORTS: { key: Sort; label: string; icon: Icon }[] = [
   { key: 'stock-asc', label: 'Stock low → high', icon: 'arrow-up' },
   { key: 'stock-desc', label: 'Stock high → low', icon: 'arrow-down' },
 ];
-const FILTERS = [
-  { key: 'product', label: 'Products', color: '#2563EB', soft: '#DBEAFE' },
-  { key: 'pet', label: 'Pets', color: '#B45309', soft: '#FEF3C7' },
-  { key: 'Low Stock', label: 'Low stock', color: '#EA580C', soft: '#FFEDD5' },
-  { key: 'Out Of Stock', label: 'Out of stock', color: '#DC2626', soft: '#FEE2E2' },
-  { key: 'Inactive', label: 'Inactive', color: '#475569', soft: '#F1F5F9' },
-];
+const STATUS_OPTS = [{ value: '', label: 'All statuses' }, { value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }];
+const TYPE_OPTS = [{ value: '', label: 'All types' }, { value: 'product', label: 'Products' }, { value: 'pet', label: 'Pets' }];
 
 /** Every product and pet listing in the store. Open with { category, categoryName } to show one category. */
 export default function SMProductsScreen({ navigation, route }: any) {
   const { tick } = useStoreManager();
-  const q = useRemote(() => smService.products(), [], tick);
+  const q = useRemote(async () => ({ products: await smService.products(), cats: await smService.categories().catch(() => []) }), [], tick);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<string[]>([]);
+  const [statusF, setStatusF] = useState('');
+  const [typeF, setTypeF] = useState('');
+  const [catF, setCatF] = useState('');
   const [sort, setSort] = useState<Sort>('newest');
   const [sortOpen, setSortOpen] = useState(false);
   const [view, setView] = useState<SMProduct | null>(null);
   const [category, setCategory] = useState<{ id: string; name: string } | null>(route.params?.category ? { id: route.params.category, name: route.params.categoryName || 'Category' } : null);
 
-  const all = q.data ?? [];
+  const all = q.data?.products ?? [];
+  const cats = q.data?.cats ?? [];
   const list = useMemo(() => {
     const k = search.trim().toLowerCase();
-    const types = filter.filter((f) => f === 'product' || f === 'pet');
-    const states = filter.filter((f) => f !== 'product' && f !== 'pet');
     const out = all.filter((p) =>
       (!category || p.categoryId === category.id) &&
-      (!types.length || types.includes(p.itemType)) &&
-      (!states.length || states.some((s) => (s === 'Inactive' ? p.status === 'Inactive' : stockStatus(p.stock) === s))) &&
+      (!statusF || p.status === statusF) && (!typeF || p.itemType === typeF) && (!catF || p.categoryId === catF) &&
       (!k || `${p.name} ${p.categoryName} ${p.breed} ${p.productId ?? ''}`.toLowerCase().includes(k)));
     const by: Record<Sort, (a: SMProduct, b: SMProduct) => number> = {
       newest: (a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
@@ -66,8 +60,8 @@ export default function SMProductsScreen({ navigation, route }: any) {
       'stock-asc': (a, b) => a.stock - b.stock, 'stock-desc': (a, b) => b.stock - a.stock,
     };
     return [...out].sort(by[sort]);
-  }, [all, search, filter, sort, category]);
-  const page = useInfiniteSlice(list, 10, `${search}|${filter.join()}|${sort}|${category?.id}`);
+  }, [all, search, statusF, typeF, catF, sort, category]);
+  const page = useInfiniteSlice(list, 10, `${search}|${statusF}|${typeF}|${catF}|${sort}|${category?.id}`);
 
   const remove = async (p: SMProduct) => {
     const r = await WonPetsAlert.delete('Delete product?', `"${p.name}" will be removed from your store.`, { confirmText: 'Yes, delete' });
@@ -76,7 +70,7 @@ export default function SMProductsScreen({ navigation, route }: any) {
       const res = await smService.deleteProduct(p.id);
       toast.success(res.message || 'Product deleted');
       setView(null);
-      q.setData((l) => l?.filter((x) => x.id !== p.id));
+      q.setData((l) => l && { ...l, products: l.products.filter((x) => x.id !== p.id) });
       q.reloadQuiet();
     } catch (e) { toast.error(errorMessage(e, 'Delete failed')); }
   };
@@ -85,28 +79,38 @@ export default function SMProductsScreen({ navigation, route }: any) {
   if (q.loading && !q.data) return <WishlistSkeleton />;
   if (q.error && !q.data) return <LoadError message={q.error} onRetry={q.reload} />;
 
-  const stats: { label: string; value: number; icon: Icon; tone: DTone }[] = [
-    { label: 'Total', value: all.length, icon: 'cube', tone: 'purple' },
-    { label: 'In stock', value: all.filter((p) => stockStatus(p.stock) === 'In Stock').length, icon: 'checkmark-circle', tone: 'green' },
-    { label: 'Low stock', value: all.filter((p) => stockStatus(p.stock) === 'Low Stock').length, icon: 'warning', tone: 'orange' },
-    { label: 'Out of stock', value: all.filter((p) => stockStatus(p.stock) === 'Out Of Stock').length, icon: 'close-circle', tone: 'red' },
-    { label: 'Pets in store', value: all.filter((p) => p.itemType === 'pet' && p.status === 'Active').reduce((s, p) => s + p.stock, 0), icon: 'paw', tone: 'amber' },
+  const stats: SMStat[] = [
+    { title: 'Total Products', value: numShort(all.length), icon: 'cube', ...SM_TINT.purple },
+    { title: 'Active', value: numShort(all.filter((p) => p.status === 'Active').length), icon: 'checkmark-circle', ...SM_TINT.green },
+    { title: 'Low Stock', value: numShort(all.filter((p) => stockStatus(p.stock) === 'Low Stock').length), icon: 'warning', ...SM_TINT.orange },
+    { title: 'Out Of Stock', value: numShort(all.filter((p) => stockStatus(p.stock) === 'Out Of Stock').length), icon: 'close-circle', ...SM_TINT.red },
+    { title: 'Pets In Store', value: numShort(all.filter((p) => p.itemType === 'pet' && p.status === 'Active').reduce((n, p) => n + p.stock, 0)), icon: 'paw', ...SM_TINT.amber },
   ];
+  const catOpts = [{ value: '', label: 'All categories' }, ...cats.map((c) => ({ value: c.id, label: c.name }))];
 
   const header = (
-    <View className="gap-3.5 mb-1">
-      <PageHeader icon="cube" title={category?.name ?? 'Products'} subtitle="Every product and pet listed in your store." />
-      <WebStatGrid stats={stats.slice(0, 4).map((x) => ({ title: x.label, value: x.value, icon: x.icon, tone: x.tone, caption: x.label === 'Total' ? `${stats[4].value} pets in store` : undefined }))} />
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Search products, pets, breeds…" trailing={{ icon: 'swap-vertical', label: 'Sort', onPress: () => setSortOpen(true) }} />
+    <View className="gap-2.5 mb-0.5">
+      <Text className="text-[11.5px] text-muted -mb-1">Manage your products and pets</Text>
+      <SMStatGrid stats={stats} cols={3} />
+      <View className="flex-row gap-2">
+        <View className="flex-1"><CustomDropdown value={statusF} onChange={setStatusF} options={STATUS_OPTS} searchable={false} title="Status" placeholder="All statuses" /></View>
+        <View className="flex-1"><CustomDropdown value={typeF} onChange={setTypeF} options={TYPE_OPTS} searchable={false} title="Type" placeholder="All types" /></View>
+      </View>
+      <CustomDropdown value={catF} onChange={setCatF} options={catOpts} title="Category" placeholder="All categories" />
+      <SearchBar value={search} onChangeText={setSearch} placeholder="Search products..." trailing={{ icon: 'swap-vertical', label: 'Sort', onPress: () => setSortOpen(true) }} />
       {!!category && (
-        <Pressable onPress={() => setCategory(null)} className="self-start flex-row items-center gap-1.5 bg-orange-100 rounded-full pl-3 pr-2 py-1.5">
+        <Pressable onPress={() => setCategory(null)} className="self-start flex-row items-center gap-1.5 bg-orange-100 rounded-full pl-3 pr-2 py-1">
           <Ionicons name="grid" size={13} color="#EA580C" />
           <Text className="text-orange-700 font-bold text-[13px]">{category.name}</Text>
           <Ionicons name="close-circle" size={16} color="#EA580C" />
         </Pressable>
       )}
-      <FilterChips options={FILTERS} active={filter} onChange={setFilter} allCount={all.length} />
-      <Text className="text-xs text-muted">{list.length} result{list.length === 1 ? '' : 's'} · {SORTS.find((s) => s.key === sort)?.label}</Text>
+      <View className="flex-row items-center justify-between">
+        <Text className="text-[11.5px] text-muted">{numShort(list.length)} product{list.length === 1 ? '' : 's'} · {SORTS.find((x) => x.key === sort)?.label}</Text>
+        <Pressable onPress={() => navigation.navigate('SMProductForm', category ? { category: category.id } : undefined)} accessibilityRole="button" accessibilityLabel="Add Product" className="flex-row items-center gap-1 bg-primary rounded-xl px-3 py-2 active:opacity-80">
+          <Ionicons name="add" size={16} color="#fff" /><Text className="text-white font-extrabold text-[12.5px]">Add Product</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -114,15 +118,15 @@ export default function SMProductsScreen({ navigation, route }: any) {
     <View className="flex-1 bg-cream">
       <FlatList
         data={page.items} keyExtractor={(p) => p.id}
-        contentContainerClassName="p-4 gap-3 pb-28"
+        contentContainerClassName={SM_PAD}
         ListHeaderComponent={header}
         refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}
         onEndReached={page.loadMore} onEndReachedThreshold={0.4}
-        ListEmptyComponent={<Empty emoji="📦" title={all.length ? 'No matching products' : 'No products yet'} body={all.length ? 'Try another search or filter.' : 'Tap "Add Product" to list your first item.'} />}
+        ListEmptyComponent={<Empty emoji="📦" title={all.length ? 'No matching products' : 'No products yet'} body={all.length ? 'Try another search or filter.' : 'Tap "Add item" to list your first one.'} />}
         ListFooterComponent={list.length ? <LoadMoreFooter hasMore={page.hasMore} total={page.total} noun="products" /> : undefined}
         renderItem={({ item: p }) => (
-          <Pressable onPress={() => setView(p)} accessibilityRole="button" accessibilityLabel={p.name} className="flex-row gap-3 bg-white rounded-3xl border border-line p-3 active:bg-primary-soft">
-            <Avatar image={p.images[0]} emoji={p.itemType === 'pet' ? '🐾' : '📦'} size={76} square />
+          <Pressable onPress={() => setView(p)} accessibilityRole="button" accessibilityLabel={p.name} className="flex-row gap-2.5 bg-white rounded-2xl border border-line p-2.5 active:bg-primary-soft">
+            <Avatar image={p.images[0]} emoji={p.itemType === 'pet' ? '🐾' : '📦'} size={64} square />
             <View className="flex-1 gap-1">
               <View className="flex-row items-center gap-1.5">
                 <Text className="flex-1 font-extrabold text-ink" numberOfLines={1}>{p.name}</Text>
@@ -131,11 +135,11 @@ export default function SMProductsScreen({ navigation, route }: any) {
               <Text className="text-[11px] text-muted" numberOfLines={1}>{p.itemType === 'pet' ? `🐾 Pet${p.breed ? ` · ${p.breed}` : ''}` : 'Product'} · {p.categoryName || 'Uncategorised'}</Text>
               <View className="flex-row items-center gap-1.5">
                 <Text className="font-black text-green-600">{inr0(p.finalPrice)}</Text>
-                {p.discount > 0 && <><Text className="text-[11px] text-muted line-through">{inr0(p.price)}</Text><Badge label={`${p.discount}% OFF`} tone="green" /></>}
+                {p.discount > 0 && <><Text className="text-[11px] text-muted line-through">{inr0(p.price)}</Text><Badge label={`${p.discount}% off`} tone="green" /></>}
               </View>
               <View className="flex-row items-center gap-2">
                 <StockBadge status={stockStatus(p.stock)} />
-                <Text className="text-[11px] text-muted">{p.stock} units</Text>
+                <Text className="text-[11px] text-muted">{numShort(p.stock)} pcs</Text>
                 {p.reviews > 0 && <Text className="text-[11px] text-amber-600">★ {p.rating.toFixed(1)}</Text>}
               </View>
             </View>
@@ -146,7 +150,6 @@ export default function SMProductsScreen({ navigation, route }: any) {
           </Pressable>
         )}
       />
-      <Fab label="Add Product" onPress={() => navigation.navigate('SMProductForm', category ? { category: category.id } : undefined)} />
 
       {/* sort */}
       <BottomSheet visible={sortOpen} onClose={() => setSortOpen(false)} title="Sort products">

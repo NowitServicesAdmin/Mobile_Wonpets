@@ -21,6 +21,8 @@ import NotificationsScreen from '../screens/main/NotificationsScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 import ChatThreadScreen from '../screens/main/ChatThreadScreen';
 import SearchScreen from '../screens/main/SearchScreen';
+import AssistantScreen from '../screens/main/AssistantScreen';
+import LegalScreen from '../screens/legal/LegalScreen';
 
 const Stack = createNativeStackNavigator();
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.bg, primary: colors.primary } };
@@ -36,6 +38,8 @@ export default function DoctorNavigator() {
           // "Shared With Me" mode (same as the owner app): only the shared pets' screens, the doctor's own stack is not mounted
           <>
             <Stack.Screen name="SharedMain" component={SharedTabs} />
+            <Stack.Screen name="Legal" component={LegalScreen} options={page('Terms & Policies')} />
+            <Stack.Screen name="AiAssistant" component={AssistantScreen} options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="Chat" component={ChatScreen} options={page('Messages')} />
             <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
             <Stack.Screen name="Search" component={SearchScreen} options={page('Search')} />
@@ -43,6 +47,8 @@ export default function DoctorNavigator() {
         ) : (
           <>
         <Stack.Screen name="DoctorMain" component={DoctorTabs} />
+        <Stack.Screen name="Legal" component={LegalScreen} options={page('Terms & Policies')} />
+        <Stack.Screen name="AiAssistant" component={AssistantScreen} options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="DoctorAppointment" component={DoctorAppointmentScreen} options={page('Appointment')} />
         <Stack.Screen name="PrescriptionForm" component={PrescriptionFormScreen} options={page('Prescription')} />
         <Stack.Screen name="PrescriptionView" component={PrescriptionViewScreen} options={page('Prescription')} />

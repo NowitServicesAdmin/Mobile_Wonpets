@@ -13,6 +13,7 @@ import { SearchRole, SearchTarget, searchPages } from '../../config/searchPages'
 import { resolveSearchTarget } from '../../utils/searchTarget';
 import { useAuth } from '../../context/AuthContext';
 import { useManaged } from '../../context/ManagedContext';
+import { ensurePermission } from '../../utils/permissions';
 
 const SEARCH_HINT: Record<SearchRole, string> = {
   user: 'Find your pets, products, orders, appointments or any page. Tap the camera to search by photo.',
@@ -104,8 +105,7 @@ export default function SearchScreen({ navigation, route }: any) {
 
   const identify = async (from: 'camera' | 'gallery') => {
     try {
-      const perm = from === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) return toast.error(from === 'camera' ? 'Camera permission is needed to take a photo.' : 'Photo access is needed to pick an image.');
+      if (!(await ensurePermission(from === 'camera' ? 'camera' : 'photos'))) return toast.error(from === 'camera' ? 'Camera permission is needed to take a photo.' : 'Photo access is needed to pick an image.');
       const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, allowsEditing: false };
       const r = from === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
       if (r.canceled) return;

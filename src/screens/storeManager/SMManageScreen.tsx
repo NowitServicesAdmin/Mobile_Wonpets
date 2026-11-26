@@ -2,70 +2,61 @@ import React from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
-import { Gradient, cn } from '../../components/ui';
 import { Skeleton, SkeletonScreen } from '../../components/Skeletons';
-import { PageHeader, TONES, DTone } from '../../components/doctor/DoctorUI';
+import { SMTitle, SM_PAD, SM_TINT, numShort } from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
-import { Overview, smService } from '../../services/storeManager.service';
+import { smService } from '../../services/storeManager.service';
 import { useStoreManager } from '../../context/StoreManagerContext';
 
 type Icon = keyof typeof Ionicons.glyphMap;
-type Card = { title: string; desc: string; key?: keyof Overview; sub: string; icon: Icon; tone: DTone; go: string };
+type Card = { title: string; desc: string; value: (o: Awaited<ReturnType<typeof load>>) => number; sub: string; btn: string; icon: Icon; tint: keyof typeof SM_TINT; go: string };
 
-/** The web "Management Overview": one card per area of the store, each with its live count. */
+const load = async () => {
+  const [overview, completed] = await Promise.all([smService.overview(), smService.reportOrders().catch(() => 0)]);
+  return { overview, completed };
+};
+
+/** The six cards of the web "Management Overview" - same titles, descriptions, counts and buttons. */
 const CARDS: Card[] = [
-  { title: 'Products', desc: 'Add, edit and manage products & pets', key: 'products', sub: 'Total products', icon: 'cube', tone: 'purple', go: 'SMProducts' },
-  { title: 'Categories', desc: 'Organise products and pets', key: 'categories', sub: 'Categories', icon: 'grid', tone: 'orange', go: 'SMCategories' },
-  { title: 'Inventory', desc: 'Track stock levels', key: 'inventory', sub: 'Low stock items', icon: 'layers', tone: 'green', go: 'SMInventory' },
-  { title: 'Orders', desc: 'Process and ship orders', key: 'orders', sub: 'Total orders', icon: 'clipboard', tone: 'blue', go: 'SMOrders' },
-  { title: 'Customers', desc: 'See who buys from you', key: 'customers', sub: 'Customers', icon: 'people', tone: 'pink', go: 'SMCustomers' },
-  { title: 'Reviews', desc: 'Approve or hide reviews', key: 'reviews', sub: 'Reviews', icon: 'star', tone: 'amber', go: 'SMReviews' },
-  { title: 'Coupons & Offers', desc: 'Run discounts and coupons', key: 'offers', sub: 'Active offers', icon: 'pricetags', tone: 'red', go: 'SMOffers' },
-  { title: 'Reports', desc: 'Sales reports & exports', sub: 'Analytics', icon: 'bar-chart', tone: 'blue', go: 'SMReports' },
+  { title: 'Products', desc: 'Add, edit and manage all your store products.', value: (o) => o.overview.products, sub: 'Total Products', btn: 'Manage Products', icon: 'cube', tint: 'purple', go: 'SMProducts' },
+  { title: 'Categories', desc: 'Organize products in different categories.', value: (o) => o.overview.categories, sub: 'Total Categories', btn: 'Manage Categories', icon: 'grid', tint: 'orange', go: 'SMCategories' },
+  { title: 'Orders', desc: 'View and manage all customer orders.', value: (o) => o.overview.orders, sub: 'Total Orders', btn: 'Manage Orders', icon: 'clipboard', tint: 'blue', go: 'SMOrders' },
+  { title: 'Reviews', desc: 'Manage customer reviews and ratings.', value: (o) => o.overview.reviews, sub: 'Total Reviews', btn: 'Manage Reviews', icon: 'star', tint: 'amber', go: 'SMReviews' },
+  { title: 'Coupons & Offers', desc: 'Create and manage discounts and offers.', value: (o) => o.overview.offers, sub: 'Active Offers', btn: 'Manage Coupons', icon: 'pricetag', tint: 'green', go: 'SMOffers' },
+  { title: 'Reports', desc: 'View detailed reports and analytics.', value: (o) => o.completed, sub: 'Completed Orders', btn: 'View Reports', icon: 'trending-up', tint: 'pink', go: 'SMReports' },
 ];
 
 export default function SMManageScreen({ navigation }: any) {
   const { tick } = useStoreManager();
-  const ov = useRemote(() => smService.overview(), [], tick);
+  const ov = useRemote(load, [], tick);
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 gap-4 pb-10"
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName={SM_PAD}
       refreshControl={<RefreshControl refreshing={ov.refreshing} onRefresh={ov.reload} tintColor={colors.primary} />}>
-      <PageHeader icon="settings" title="Management" subtitle="Handle all your store data and operations in one place." />
-
-      {/* earnings banner */}
-      <Pressable onPress={() => navigation.navigate('SMEarnings')} accessibilityRole="button" className="active:opacity-90">
-        <Gradient className="rounded-3xl p-4 flex-row items-center gap-3 overflow-hidden" colorsArr={['#FB923C', '#F97316']}>
-          <View className="w-12 h-12 rounded-2xl bg-white/25 items-center justify-center"><Ionicons name="wallet" size={24} color="#fff" /></View>
-          <View className="flex-1">
-            <Text className="text-white text-[16px] font-extrabold">Earnings & Payouts</Text>
-            <Text className="text-white/90 text-xs">Revenue trend, payouts and transactions</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
-        </Gradient>
-      </Pressable>
+      <SMTitle title="Management Overview" subtitle="Handle all your store data and operations in one place." />
 
       {ov.loading && !ov.data ? (
-        <SkeletonScreen className="flex-row flex-wrap gap-3">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="w-[48.4%] h-[150px] rounded-3xl" />)}
+        <SkeletonScreen className="flex-row flex-wrap gap-2.5">
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="w-[48.6%] h-[150px] rounded-2xl" />)}
         </SkeletonScreen>
       ) : (
-        <View className="flex-row flex-wrap gap-3">
+        <View className="flex-row flex-wrap gap-2.5">
           {CARDS.map((c) => {
-            const t = TONES[c.tone];
-            const value = c.key ? ov.data?.[c.key] ?? '—' : '';
+            const t = SM_TINT[c.tint];
+            const v = ov.data ? numShort(c.value(ov.data)) : '—';
             return (
               <Pressable key={c.title} onPress={() => navigation.navigate(c.go)} accessibilityRole="button" accessibilityLabel={c.title}
-                className="w-[48.4%] bg-white rounded-3xl border border-line p-3.5 active:bg-primary-soft">
-                <View className="flex-row items-center justify-between">
-                  <View className={cn('w-11 h-11 rounded-full items-center justify-center', t.soft)}><Ionicons name={c.icon} size={21} color={t.fg} /></View>
-                  <Ionicons name="arrow-forward" size={16} color="#CDBFB0" />
+                className="w-[48.6%] bg-white rounded-2xl border border-line p-3 active:bg-primary-soft">
+                <View className="flex-row items-center gap-2">
+                  <View style={{ backgroundColor: t.bg }} className="w-10 h-10 rounded-xl items-center justify-center"><Ionicons name={c.icon} size={20} color={t.fg} /></View>
+                  <Text className="flex-1 text-[14px] font-extrabold text-ink" numberOfLines={2}>{c.title}</Text>
                 </View>
-                <Text className="text-[15px] font-extrabold text-ink mt-2.5" numberOfLines={1}>{c.title}</Text>
-                <Text className="text-[11px] text-muted leading-[14px]" numberOfLines={2}>{c.desc}</Text>
-                <View className="flex-row items-end gap-1.5 mt-2.5">
-                  {value !== '' && <Text className="text-[22px] font-black text-ink leading-6">{value}</Text>}
-                  <Text className={cn('text-[11px] font-semibold mb-0.5', t.text)}>{c.sub}</Text>
+                <Text className="text-[11px] text-muted leading-[14px] mt-1.5" numberOfLines={2}>{c.desc}</Text>
+                <Text className="text-[22px] font-black text-ink leading-7 mt-1.5">{v}</Text>
+                <Text className="text-[11px] text-muted">{c.sub}</Text>
+                <View style={{ backgroundColor: t.bg }} className="flex-row items-center justify-center gap-1 rounded-full py-1.5 mt-2">
+                  <Text style={{ color: t.fg }} className="text-[11.5px] font-bold" numberOfLines={1}>{c.btn}</Text>
+                  <Ionicons name="arrow-forward" size={12} color={t.fg} />
                 </View>
               </Pressable>
             );

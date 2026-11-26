@@ -5,24 +5,28 @@ import { colors } from '../../theme';
 import { Empty, Gradient, cn } from '../../components/ui';
 import { DashboardSkeleton } from '../../components/Skeletons';
 import { toast } from '../../components/WonPetsAlert';
-import { Panel, PanelHeader, TONES, DTone, PageHeader } from '../../components/doctor/DoctorUI';
-import { AreaChart, Badge, Donut, Legend, LoadError, Sparkline, changeColor, changeLabel, inr0, inrShort } from '../../components/storeManager/SMUI';
+import {
+  AreaChart, Donut, LoadError, SMCard, SMCardHead, SMTitle, SM_PAD, SM_TINT, Sparkline, changeColor, changeLabel, inr0, inrShort, numShort,
+} from '../../components/storeManager/SMUI';
 import { useRemote } from '../../hooks/useRemote';
 import { Earnings, smService } from '../../services/storeManager.service';
 import { useStoreManager } from '../../context/StoreManagerContext';
 
 type Icon = keyof typeof Ionicons.glyphMap;
 type Range = 7 | 30 | 90;
-const CARDS: { key: keyof Earnings['stats']; title: string; money: boolean; icon: Icon; tone: DTone }[] = [
-  { key: 'revenue', title: 'Total Revenue', money: true, icon: 'wallet', tone: 'green' },
-  { key: 'orders', title: 'Delivered Orders', money: false, icon: 'bag-check', tone: 'purple' },
-  { key: 'net', title: 'Net Earnings', money: true, icon: 'cash', tone: 'orange' },
-  { key: 'payouts', title: 'Total Payouts', money: true, icon: 'card', tone: 'pink' },
-  { key: 'pending', title: 'Pending Payout', money: true, icon: 'time', tone: 'blue' },
+const RANGES: { value: Range; label: string }[] = [{ value: 7, label: '7D' }, { value: 30, label: '30D' }, { value: 90, label: '90D' }];
+
+/** The five stat cards of the web Earnings page (same order, same titles). */
+const CARDS: { key: keyof Earnings['stats']; title: string; money: boolean; icon: Icon; tint: keyof typeof SM_TINT }[] = [
+  { key: 'revenue', title: 'Total Revenue', money: true, icon: 'wallet', tint: 'green' },
+  { key: 'orders', title: 'Delivered Orders', money: false, icon: 'bag-check', tint: 'purple' },
+  { key: 'net', title: 'Net Earnings', money: true, icon: 'cash', tint: 'orange' },
+  { key: 'payouts', title: 'Total Payouts', money: true, icon: 'card', tint: 'pink' },
+  { key: 'pending', title: 'Pending Payout', money: true, icon: 'time', tint: 'blue' },
 ];
 const csv = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
-/** Earnings Overview (web SMEarnings): stat cards with sparklines, revenue trend for 7/30/90 days, breakdown, summary, export. */
+/** Earnings Overview (web SMEarnings): stat cards, revenue trend (7D / 30D / 90D), earnings breakdown, summary + export. */
 export default function SMEarningsScreen({ navigation }: any) {
   const { tick } = useStoreManager();
   const [range, setRange] = useState<Range>(7);
@@ -42,126 +46,131 @@ export default function SMEarningsScreen({ navigation }: any) {
   if (!d) return null;
 
   const t = d.trend;
-  const breakdownTotal = d.breakdown.reduce((s, b) => s + b.value, 0);
-  const summary: [string, number][] = [
-    ['Total Revenue', d.summary.totalRevenue], ['Net Earnings', d.summary.netEarnings], ['Total Payouts', d.summary.totalPayouts],
-    ['Pending Payout', d.summary.pendingPayout], ['Platform Fees', d.summary.platformFees], ['COD Collected', d.summary.codCollected],
+  const sm = d.summary;
+  const breakdown = d.breakdown.map((b) => ({ label: b.name, value: b.value, color: b.color }));
+  const breakdownTotal = breakdown.reduce((s, b) => s + b.value, 0);
+  const payoutPct = sm.netEarnings > 0 ? Math.min(100, Math.round((sm.totalPayouts / sm.netEarnings) * 100)) : 0;
+  const feePct = sm.totalRevenue > 0 ? ((sm.platformFees / sm.totalRevenue) * 100).toFixed(1) : '0.0';
+  const tiles: { label: string; value: string; icon: Icon; tint: keyof typeof SM_TINT }[] = [
+    { label: 'Total Revenue', value: inrShort(sm.totalRevenue), icon: 'wallet', tint: 'green' },
+    { label: `Platform Fees · ${feePct}%`, value: inrShort(sm.platformFees), icon: 'pie-chart', tint: 'purple' },
+    { label: 'COD Collected', value: inrShort(sm.codCollected), icon: 'cash', tint: 'blue' },
+    { label: 'Success Rate', value: `${d.successRate}%`, icon: 'shield-checkmark', tint: 'green' },
   ];
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 gap-4 pb-10"
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName={SM_PAD}
       refreshControl={<RefreshControl refreshing={q.refreshing} onRefresh={q.reload} tintColor={colors.primary} />}>
-      <PageHeader icon="trending-up" title="Earnings" subtitle="Track your revenue, payouts and transactions." />
-
-      {/* range + export */}
-      <View className="flex-row items-center gap-2">
-        <View className="flex-row bg-white border border-line rounded-2xl p-1 flex-1">
-          {([7, 30, 90] as Range[]).map((r) => (
-            <Pressable key={r} onPress={() => setRange(r)} className={cn('flex-1 py-2 rounded-xl items-center', range === r && 'bg-primary')}>
-              <Text className={cn('font-bold text-[13px]', range === r ? 'text-white' : 'text-muted')}>{r} days</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable onPress={exportCsv} accessibilityRole="button" accessibilityLabel="Export transactions" className="h-11 px-3.5 rounded-2xl bg-ink flex-row items-center gap-1.5 active:opacity-80">
-          <Ionicons name="download-outline" size={16} color="#fff" /><Text className="text-white font-bold text-[13px]">Export</Text>
-        </Pressable>
-      </View>
+      <SMTitle title="Earnings Overview" subtitle="Track your store earnings, transactions and payouts."
+        right={
+          <Pressable onPress={exportCsv} accessibilityRole="button" accessibilityLabel="Export report" className="flex-row items-center gap-1 rounded-xl bg-primary px-3 py-2 active:opacity-80">
+            <Ionicons name="download-outline" size={14} color="#fff" /><Text className="text-white font-bold text-[12px]">Export</Text>
+          </Pressable>
+        } />
 
       {/* stat cards */}
-      <View className="flex-row flex-wrap gap-3">
+      <View className="flex-row flex-wrap gap-2">
         {CARDS.map((c, i) => {
           const s = d.stats[c.key];
-          const tn = TONES[c.tone];
+          const tn = SM_TINT[c.tint];
+          const lone = i === CARDS.length - 1;
           return (
-            <View key={c.key} className={cn('bg-white rounded-3xl border border-line p-3.5', i === 0 ? 'w-full' : 'w-[48.4%]')}>
-              <View className="flex-row items-center justify-between">
-                <View className={cn('w-11 h-11 rounded-full items-center justify-center', tn.soft)}><Ionicons name={c.icon} size={19} color={tn.fg} /></View>
-                <Sparkline values={s.spark} color={tn.fg} width={i === 0 ? 120 : 64} />
+            <View key={c.key} className={cn(lone ? 'w-full' : 'w-[48.8%]', 'bg-white rounded-2xl border border-line px-2.5 py-2')}>
+              <View className="flex-row items-center gap-2">
+                <View style={{ backgroundColor: tn.bg }} className="w-8 h-8 rounded-full items-center justify-center"><Ionicons name={c.icon} size={15} color={tn.fg} /></View>
+                <View className="flex-1">
+                  <Text className="text-[10.5px] font-semibold text-muted" numberOfLines={1}>{c.title}</Text>
+                  <Text className="text-[17px] font-black text-ink leading-[21px]" numberOfLines={1} adjustsFontSizeToFit>{c.money ? inrShort(s.value) : numShort(s.value)}</Text>
+                </View>
+                <Sparkline values={s.spark} color={tn.fg} width={lone ? 90 : 44} height={22} />
               </View>
-              <Text className="text-[12px] text-muted mt-2">{c.title}</Text>
-              <Text className="text-[22px] font-black text-ink" numberOfLines={1} adjustsFontSizeToFit>{c.money ? inr0(s.value) : s.value}</Text>
-              <Text style={{ color: changeColor(s.change) }} className="text-[11.5px] font-bold">{changeLabel(s.change)} <Text className="text-muted font-normal">vs prev {range}d</Text></Text>
+              <Text style={{ color: changeColor(s.change) }} className="text-[10.5px] font-bold mt-1">{changeLabel(s.change)} <Text className="text-muted font-normal">vs prev {range}d</Text></Text>
             </View>
           );
         })}
       </View>
 
       {/* revenue trend */}
-      <Panel>
-        <PanelHeader icon="trending-up" title="Revenue Trend" caption="Daily revenue from delivered orders" />
-        <View className="flex-row items-end justify-between mb-3">
-          <View><Text className="text-xs text-muted">Last {range} days</Text><Text className="text-[24px] font-black text-ink">{inrShort(t.periodTotal)}</Text></View>
-          <Badge label={changeLabel(t.change)} tone={(t.change ?? 0) >= 0 ? 'green' : 'red'} icon={(t.change ?? 0) >= 0 ? 'arrow-up' : 'arrow-down'} />
+      <SMCard>
+        <SMCardHead title="Revenue Trend" caption={`Last ${range} days`}
+          right={
+            <View className="flex-row bg-cream rounded-full p-0.5 border border-line">
+              {RANGES.map((r) => (
+                <Pressable key={r.value} onPress={() => setRange(r.value)} accessibilityRole="button" className={cn('px-2.5 py-1 rounded-full', range === r.value && 'bg-primary')}>
+                  <Text className={cn('text-[11px] font-bold', range === r.value ? 'text-white' : 'text-muted')}>{r.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          } />
+        <View className="flex-row items-center gap-2 mb-1.5">
+          <Text className="text-[20px] font-black text-ink">{inrShort(t.periodTotal)}</Text>
+          <View style={{ backgroundColor: (t.change ?? 0) >= 0 ? '#DCFCE7' : '#FEE2E2' }} className="rounded-full px-1.5 py-0.5">
+            <Text style={{ color: changeColor(t.change) }} className="text-[10.5px] font-bold">{changeLabel(t.change)}</Text>
+          </View>
         </View>
-        <AreaChart data={t.data} format={inr0} maxLabels={6} />
-        <View className="flex-row mt-4 pt-3 border-t border-line">
-          {([['Average', `${inrShort(t.average)}/day`, colors.text], ['Peak day', inrShort(t.peak), colors.text], ['Growth', changeLabel(t.change), changeColor(t.change)]] as const).map(([k, v, c]) => (
-            <View key={k} className="flex-1 items-center"><Text className="text-[11px] text-muted">{k}</Text><Text style={{ color: c }} className="text-[15px] font-extrabold">{v}</Text></View>
+        <AreaChart data={t.data} format={inrShort} maxLabels={6} height={125} />
+        <View className="flex-row mt-2 pt-2 border-t border-line">
+          {([['Average Revenue', inrShort(t.average), colors.text], ['Peak Day', inrShort(t.peak), colors.text], ['Growth', changeLabel(t.change), changeColor(t.change)]] as const).map(([k, v, c]) => (
+            <View key={k} className="flex-1 items-center"><Text className="text-[10.5px] text-muted">{k}</Text><Text style={{ color: c }} className="text-[14px] font-extrabold">{v}</Text></View>
           ))}
         </View>
-      </Panel>
+      </SMCard>
 
-      {/* breakdown */}
-      <Panel>
-        <PanelHeader icon="pie-chart" tone="purple" title="Earnings Breakdown" caption="Revenue distribution" />
-        {d.breakdown.length ? (
-          <>
-            <Donut data={d.breakdown.map((b) => ({ label: b.name, value: b.value, color: b.color }))} centerValue={inrShort(breakdownTotal)} centerLabel="Total" />
-            <Legend data={d.breakdown.map((b) => ({ label: b.name, value: b.value, color: b.color }))} format={inr0} />
-          </>
-        ) : <Empty emoji="🧾" title="Nothing to break down yet" />}
-      </Panel>
+      {/* earnings breakdown */}
+      <SMCard>
+        <SMCardHead title="Earnings Breakdown" caption="Revenue distribution" />
+        {breakdown.length ? (
+          <View className="flex-row items-center gap-3">
+            <Donut size={118} stroke={16} data={breakdown} centerValue={inrShort(breakdownTotal)} centerLabel="Total" />
+            <View className="flex-1 gap-1.5">
+              {breakdown.map((b) => (
+                <View key={b.label} className="flex-row items-center gap-1.5 rounded-xl border border-line px-2 py-1.5">
+                  <View style={{ backgroundColor: b.color }} className="w-2.5 h-2.5 rounded-full" />
+                  <View className="flex-1">
+                    <Text className="text-[11.5px] font-semibold text-ink" numberOfLines={1}>{b.label}</Text>
+                    <Text className="text-[10px] text-muted">{((b.value / (breakdownTotal || 1)) * 100).toFixed(1)}%</Text>
+                  </View>
+                  <Text className="text-[12px] font-bold text-ink" numberOfLines={1}>{inrShort(b.value)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : <Empty emoji="🧾" title="Breakdown appears once you have delivered orders." />}
+      </SMCard>
 
       {/* summary */}
-      <Panel>
-        <PanelHeader icon="document-text" tone="blue" title="Payout Summary" caption="All-time totals" />
-        <View className="gap-2.5">
-          {summary.map(([k, v]) => (
-            <View key={k} className="flex-row items-center justify-between bg-cream rounded-xl px-3.5 py-2.5">
-              <Text className="text-[13px] text-muted">{k}</Text><Text className="text-[15px] font-extrabold text-ink">{inr0(v)}</Text>
+      <SMCard>
+        <SMCardHead title="Summary" caption="Performance overview" right={<View className="rounded-full border border-line px-2 py-0.5"><Text className="text-[11px] font-bold text-primary">Last {range}d</Text></View>} />
+        <Gradient colorsArr={['#FF7A1A', '#F59E0B']} className="rounded-2xl p-3 overflow-hidden">
+          <View className="flex-row items-start justify-between">
+            <View>
+              <Text className="text-[11px] text-orange-50">Net Earnings</Text>
+              <Text className="text-[22px] font-black text-white">{inr0(sm.netEarnings)}</Text>
+            </View>
+            <View className="flex-row items-center gap-1 rounded-full bg-white/25 px-2 py-1">
+              <Ionicons name={(t.change ?? 0) < 0 ? 'trending-down' : 'trending-up'} size={12} color="#fff" />
+              <Text className="text-white text-[11px] font-bold">{changeLabel(t.change)}</Text>
+            </View>
+          </View>
+          <View className="flex-row justify-between mt-2 mb-1"><Text className="text-[11px] text-orange-50">Paid out</Text><Text className="text-[11px] font-bold text-white">{payoutPct}%</Text></View>
+          <View className="h-2 rounded-full bg-white/30 overflow-hidden"><View style={{ width: `${payoutPct}%` }} className="h-2 rounded-full bg-white" /></View>
+          <View className="flex-row justify-between mt-2">
+            <View><Text className="text-[11px] text-orange-50">Payouts</Text><Text className="text-white font-bold">{inrShort(sm.totalPayouts)}</Text></View>
+            <View className="items-end"><Text className="text-[11px] text-orange-50">Pending</Text><Text className="text-white font-bold">{inrShort(sm.pendingPayout)}</Text></View>
+          </View>
+        </Gradient>
+        <View className="flex-row flex-wrap gap-2 mt-2">
+          {tiles.map((x) => (
+            <View key={x.label} className="w-[48.6%] flex-row items-center gap-2 rounded-xl border border-line bg-white p-2">
+              <View style={{ backgroundColor: SM_TINT[x.tint].bg }} className="w-7 h-7 rounded-lg items-center justify-center"><Ionicons name={x.icon} size={14} color={SM_TINT[x.tint].fg} /></View>
+              <View className="flex-1"><Text className="text-[10px] text-muted" numberOfLines={1}>{x.label}</Text><Text className="text-[14px] font-bold text-ink" numberOfLines={1}>{x.value}</Text></View>
             </View>
           ))}
         </View>
-        <View className="flex-row mt-3.5 gap-2.5">
-          <View className="flex-1 bg-green-50 rounded-xl p-3"><Text className="text-[11px] text-muted">Success rate</Text><Text className="text-[18px] font-black text-green-600">{d.successRate}%</Text></View>
-          <View className="flex-1 bg-orange-50 rounded-xl p-3"><Text className="text-[11px] text-muted">Growth</Text><Text style={{ color: changeColor(t.change) }} className="text-[18px] font-black">{changeLabel(t.change)}</Text></View>
-        </View>
-        <Pressable onPress={() => navigation.navigate('SMReports')} className="flex-row items-center justify-center gap-1.5 mt-3.5 py-2">
-          <Text className="text-primary font-bold">View detailed reports</Text><Ionicons name="arrow-forward" size={15} color={colors.primary} />
+        <Pressable onPress={() => navigation.navigate('SMReports')} accessibilityRole="button" className="flex-row items-center justify-center gap-1.5 rounded-xl bg-slate-900 py-2.5 mt-2 active:opacity-80">
+          <Text className="text-white font-bold text-[13px]">View Detailed Report</Text><Ionicons name="arrow-forward" size={14} color="#fff" />
         </Pressable>
-      </Panel>
-
-      {/* weekly banner */}
-      <Gradient className="rounded-3xl p-4 overflow-hidden" colorsArr={['#FFF1E3', '#FFE0C2']}>
-        <View className="flex-row items-center gap-2"><Text className="text-[22px]">🏆</Text><Text className="text-[16px] font-black text-ink flex-1">This week</Text></View>
-        <Text className="text-[13px] text-muted leading-5 mt-2">
-          {d.weekly.change === null
-            ? 'Your first delivered orders this week — keep it going!'
-            : <>You earned <Text style={{ color: (d.weekly.change ?? 0) >= 0 ? colors.primary : colors.red }} className="font-extrabold">{Math.abs(d.weekly.change)}% {d.weekly.change >= 0 ? 'more' : 'less'}</Text> revenue than last week.</>}
-        </Text>
-        <View className="flex-row gap-2.5 mt-3">
-          <View className="flex-1 bg-white/80 rounded-xl p-3"><Text className="text-[11px] text-muted">Weekly revenue</Text><Text className="text-[17px] font-black text-ink">{inrShort(d.weekly.revenue)}</Text></View>
-          <View className="flex-1 bg-white/80 rounded-xl p-3"><Text className="text-[11px] text-muted">vs last week</Text><Text style={{ color: changeColor(d.weekly.change) }} className="text-[17px] font-black">{changeLabel(d.weekly.change)}</Text></View>
-        </View>
-      </Gradient>
-
-      {/* recent transactions */}
-      {d.transactions.length > 0 && (
-        <Panel>
-          <PanelHeader icon="swap-vertical" tone="green" title="Recent Transactions" caption="Latest delivered & paid orders" />
-          <View className="gap-2">
-            {d.transactions.slice(0, 8).map((r) => (
-              <View key={`${r.orderId}-${r.date}`} className="flex-row items-center gap-3 border border-line rounded-xl p-2.5">
-                <View className="flex-1">
-                  <Text className="font-bold text-ink" numberOfLines={1}>{r.orderId}</Text>
-                  <Text className="text-[11px] text-muted">{new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {r.paymentMethod} · fee {inr0(r.platformFee)}</Text>
-                </View>
-                <View className="items-end gap-1"><Text className="font-extrabold text-green-600">{inr0(r.net)}</Text><Badge label={r.payoutStatus || '—'} tone={/paid|settled|complete/i.test(r.payoutStatus) ? 'green' : 'amber'} /></View>
-              </View>
-            ))}
-          </View>
-        </Panel>
-      )}
+      </SMCard>
     </ScrollView>
   );
 }

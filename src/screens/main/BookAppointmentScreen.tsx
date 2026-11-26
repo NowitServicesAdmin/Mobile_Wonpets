@@ -16,6 +16,7 @@ import { usePets } from '../../context/PetsContext';
 import { useCart } from '../../context/CartContext';
 import { inr } from '../../utils/orders';
 import { getCurrentCoords } from '../../utils/location';
+import { ensurePermission } from '../../utils/permissions';
 import { payWithRazorpay, PaymentCancelled } from '../../utils/razorpay';
 import { appointmentsService } from '../../services/appointments.service';
 import { errorMessage } from '../../services/api';
@@ -123,8 +124,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
   };
   const takePhoto = async () => {
     if (files.length >= MAX_FILES) return toast.info(`You can attach up to ${MAX_FILES} files.`);
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return toast.error('Camera permission is needed to take a photo.');
+    if (!(await ensurePermission('camera'))) return toast.error('Camera permission is needed to take a photo.');
     const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
     if (!res.canceled) addFiles(res.assets.map(toAttach));
   };

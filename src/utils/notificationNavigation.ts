@@ -83,16 +83,16 @@ export function getStoreNotificationTarget(n: { actionUrl?: string; type?: strin
   const orderId = param(url, 'orderId');
   if (orderId) return { name: 'SMOrderDetail', params: { id: orderId } };
   const tab = (screen: string, params?: object): SearchTarget => ({ name: 'SMMain', params: { screen, params } });
-  if (/\/management\/orders/.test(url)) return tab('SMOrders');
+  if (/\/management\/orders/.test(url)) return { name: 'SMOrders' };
   if (/\/management\/reviews/.test(url)) return { name: 'SMReviews' };
   if (/\/management\/inventory/.test(url)) return { name: 'SMInventory' };
   if (/\/management\/products/.test(url)) return { name: 'SMProducts' };
   if (/\/management\/offers/.test(url)) return { name: 'SMOffers' };
-  if (/\/earnings/.test(url)) return { name: 'SMEarnings' };
+  if (/\/earnings/.test(url)) return tab('SMEarnings');
   if (/\/settings/.test(url)) return tab('SMProfile', { open: /subscri/i.test(url) ? 'subscription' : /kyc/i.test(url) ? 'kyc' : /document/i.test(url) ? 'documents' : 'store', at: Date.now() });
   const text = `${n.title ?? ''} ${n.body ?? ''}`.toLowerCase();
   switch (n.type) {
-    case 'Order': return tab('SMOrders');
+    case 'Order': return { name: 'SMOrders' };
     case 'System':
       if (/stock/.test(text)) return { name: 'SMInventory' };
       if (/review/.test(text)) return { name: 'SMReviews' };

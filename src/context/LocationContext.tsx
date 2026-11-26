@@ -32,12 +32,17 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const busy = useRef(false);
   const last = useRef<LivePlace | null>(null);
   last.current = place;
+  // the first refresh after sign-in may show the permission dialog (the "at start" prompt); later refreshes (coming back to
+  // the app) only look - a skipped permission is asked again by the feature that needs it, not on every app switch
+  const firstAsk = useRef(true);
 
   const refresh = useCallback(async (force = false) => {
     if (busy.current) return;
     busy.current = true;
     try {
-      const coords: Coords | null = await getCurrentCoords({ fresh: true });
+      const prompt = firstAsk.current ? 'system' : 'none';
+      firstAsk.current = false;
+      const coords: Coords | null = await getCurrentCoords({ fresh: true, prompt });
       if (!coords) return; // denied / unavailable: keep whatever we had
       const prev = last.current;
       if (!force && prev && Date.now() - prev.at < MAX_AGE_MS && metresBetween(coords, { lat: prev.lat, lng: prev.lng }) < MOVED_METRES) return;
@@ -52,6 +57,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   // show the last known place instantly, then update it
   useEffect(() => {
     if (!user?.id) { setPlace(null); return; }
+    firstAsk.current = true;
     let live = true;
     setDetecting(true);
     AsyncStorage.getItem(KEY).then((raw) => { if (live && raw) { try { setPlace(JSON.parse(raw)); } catch { /* ignore */ } } }).catch(() => {}).finally(() => { refresh().finally(() => askCallPermissionsOnce()); });

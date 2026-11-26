@@ -34,7 +34,10 @@ const shiftDay = (iso: string, by: number) => { const d = new Date(`${iso}T00:00
 
 /** The web's "Appointment Summary" panel: one tinted row per status for the picked day. */
 function Summary({ all }: { all: Appointment[] }) {
+  const [expanded, setExpanded] = useState(true);
+
   const n = (s: string) => all.filter((a) => a.status === s).length;
+
   const rows: { label: string; value: number; icon: keyof typeof Ionicons.glyphMap; tone: DTone }[] = [
     { label: 'Total Appointments', value: all.length, icon: 'calendar', tone: 'blue' },
     { label: 'Completed', value: n('Completed'), icon: 'checkmark-circle', tone: 'green' },
@@ -42,23 +45,80 @@ function Summary({ all }: { all: Appointment[] }) {
     { label: 'In Progress', value: n('In Progress'), icon: 'sync-circle', tone: 'blue' },
     { label: 'Pending', value: n('Pending'), icon: 'time', tone: 'amber' },
   ];
+
   return (
     <Panel>
-      <PanelHeader icon="bar-chart" title="Appointment Summary" />
-      <View className="gap-1.5">
-        {rows.map((r) => (
-          <View key={r.label} className={cn('flex-row items-center justify-between rounded-xl px-3 py-2.5', TONES[r.tone].pale)}>
-            <View className="flex-row items-center gap-2.5">
-              <View className="w-7 h-7 rounded-lg bg-white items-center justify-center"><Ionicons name={r.icon} size={14} color={TONES[r.tone].fg} /></View>
-              <Text className="text-[13px] font-semibold text-slate-800">{r.label}</Text>
-            </View>
-            <Text style={{ color: TONES[r.tone].fg }} className="text-base font-bold">{r.value}</Text>
+      {/* Collapsible Header */}
+      <Pressable
+        onPress={() => setExpanded((prev) => !prev)}
+        accessibilityRole="button"
+        accessibilityLabel="Toggle appointment summary"
+        accessibilityState={{ expanded }}
+        className="flex-row items-center justify-between"
+      >
+        <View className="flex-row items-center gap-2.5">
+          <View className="w-11 h-11 rounded-full bg-orange-100 items-center justify-center">
+            <Ionicons name="bar-chart" size={22} color="#F97316" />
           </View>
-        ))}
-      </View>
+          <View>
+            <Text className="text-base font-bold text-slate-900">
+              Appointment Summary
+            </Text>
+            {!expanded && (
+              <Text className="text-xs text-gray-500 mt-0.5">
+                {all.length} total appointments
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View className="w-8 h-8 rounded-full bg-orange-50 items-center justify-center">
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={19}
+            color="#F97316"
+          />
+        </View>
+      </Pressable>
+
+      {/* Expandable Content */}
+      {expanded && (
+        <View className="gap-1.5 mt-4">
+          {rows.map((r) => (
+            <View
+              key={r.label}
+              className={cn(
+                'flex-row items-center justify-between rounded-xl px-3 py-2.5',
+                TONES[r.tone].pale
+              )}
+            >
+              <View className="flex-row items-center gap-2.5">
+                <View className="w-7 h-7 rounded-lg bg-white items-center justify-center">
+                  <Ionicons
+                    name={r.icon}
+                    size={18}
+                    color={TONES[r.tone].fg}
+                  />
+                </View>
+                <Text className="text-[13px] font-semibold text-slate-800">
+                  {r.label}
+                </Text>
+              </View>
+
+              <Text
+                style={{ color: TONES[r.tone].fg }}
+                className="text-base font-bold"
+              >
+                {r.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </Panel>
   );
 }
+
 
 /** Doctor schedule - web layout: title block, date navigator, summary panel, then the appointment list (requests / upcoming / past tabs too). */
 export default function DoctorScheduleScreen({ navigation, route }: any) {

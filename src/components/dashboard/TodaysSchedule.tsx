@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated, PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { Card, T, cn } from '../ui';
@@ -37,6 +37,9 @@ function itemStyle(t: ScheduleItem): { icon: IconName; box: string; fg: string }
 // Fixed-height rows (like the doctor dashboard): about four rows show, the rest scroll inside the card instead of stretching the page.
 const ROW_H = 50, ROW_GAP = 6, LIST_MAX = ROW_H * 4 + ROW_GAP * 3;
 
+// Swipe tuning: how far (px) or how fast a horizontal drag must be to switch pets.
+const SWIPE_DISTANCE = 50, SWIPE_VELOCITY = 0.5, SLIDE_PX = 36;
+
 /** Slim "all done" note once the last task has slid away (waits for the exit animation). */
 function DoneNote({ show }: { show: boolean }) {
   const op = useRef(new Animated.Value(0)).current;
@@ -68,6 +71,46 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
   const pet = pets.length ? pets[idx >= pets.length ? 0 : idx] : null;
   const tasks = useMemo(() => (pet ? scheduleFor(pet.id) : []), [pet, scheduleFor]);
 
+  // ---- Pet switching: arrow buttons and horizontal swipe share the same animated `go` ----
+  const slideX = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(1)).current;
+  const busy = useRef(false);
+  const countRef = useRef(pets.length);
+  countRef.current = pets.length;
+
+  /** dir: 1 = next pet (content slides left), -1 = previous pet (content slides right). */
+  const go = useRef((dir: 1 | -1) => {
+    if (busy.current || countRef.current < 2) { Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start(); return; }
+    busy.current = true;
+    Animated.parallel([
+      Animated.timing(slideX, { toValue: -dir * SLIDE_PX, duration: 110, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 0, duration: 110, useNativeDriver: true }),
+    ]).start(() => {
+      const n = countRef.current;
+      setIdx((i) => { const cur = i >= n ? 0 : i; return (cur + dir + n) % n; });
+      slideX.setValue(dir * SLIDE_PX);
+      Animated.parallel([
+        Animated.timing(slideX, { toValue: 0, duration: 170, useNativeDriver: true }),
+        Animated.timing(fade, { toValue: 1, duration: 170, useNativeDriver: true }),
+      ]).start(() => { busy.current = false; });
+    });
+  }).current;
+
+  const pan = useRef(
+    PanResponder.create({
+      // claim only clearly horizontal drags so vertical page / list scrolling and taps keep working
+      onMoveShouldSetPanResponder: (_e, g) => countRef.current > 1 && Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_e, g) => { if (!busy.current) slideX.setValue(g.dx * 0.35); },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx <= -SWIPE_DISTANCE || g.vx <= -SWIPE_VELOCITY) go(1);        // swipe left  -> next pet
+        else if (g.dx >= SWIPE_DISTANCE || g.vx >= SWIPE_VELOCITY) go(-1);     // swipe right -> previous pet
+        else Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+      },
+      onPanResponderTerminate: () => { Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start(); },
+    }),
+  ).current;
+
   if (!pet) {
     return (
       <Card className="items-center py-6">
@@ -78,8 +121,9 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
     );
   }
 
-  const prev = () => setIdx((i) => (i === 0 ? pets.length - 1 : i - 1));
-  const next = () => setIdx((i) => (i === pets.length - 1 ? 0 : i + 1));
+  const prev = () => go(-1);
+  const next = () => go(1);
+  const curIdx = idx >= pets.length ? 0 : idx;
 
   // appointments are read-only, everything else (incl. medicine doses) is actionable
   const actionable = tasks.filter((t) => t.itemType !== 'appointment');
@@ -105,6 +149,8 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
         </Pressable>
       </View>
 
+      {/* Swipe left / right anywhere on the pet row or task list to change pet (arrows still work) */}
+      <Animated.View {...pan.panHandlers} style={{ opacity: fade, transform: [{ translateX: slideX }] }}>
       {/* Pet switcher */}
       <View className="flex-row items-center gap-1.5 mb-2.5">
         {many && (
@@ -126,6 +172,14 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
           </Pressable>
         )}
       </View>
+
+      {many && (
+        <View className="flex-row items-center justify-center gap-1 mb-2" accessibilityLabel={`Pet ${curIdx + 1} of ${pets.length}. Swipe left or right to switch.`}>
+          {pets.map((p, i) => (
+            <View key={p.id} className={cn('h-1.5 rounded-full', i === curIdx ? 'w-4 bg-primary' : 'w-1.5 bg-orange-200')} />
+          ))}
+        </View>
+      )}
 
       {tasks.length === 0 ? (
         <View className="flex-row items-center gap-3 bg-orange-50/60 border border-orange-100 rounded-2xl p-3">
@@ -185,6 +239,7 @@ export default function TodaysSchedule({ pets, scheduleFor, completeTask, onDele
           <DoneNote show={tasks.every((t) => t.status === 'completed')} />
         </>
       )}
+      </Animated.View>
     </Panel>
   );
 }

@@ -25,8 +25,8 @@ const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionico
   DoctorPatients: ['paw-outline', 'paw'],
   DoctorProfile: ['person-outline', 'person'],
   SMHome: ['home-outline', 'home'],
-  SMOrders: ['receipt-outline', 'receipt'],
   SMManage: ['grid-outline', 'grid'],
+  SMEarnings: ['trending-up-outline', 'trending-up'],
   SMProfile: ['person-outline', 'person'],
 };
 
@@ -102,10 +102,8 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     );
   };
 
-  const onCenterPress = () => {
-    const first = state.routes[0];
-    if (state.index !== 0) navigation.navigate({ name: first.name, params: first.params } as never);
-  };
+  // The center logo opens the WonPet AI chatbot (a stack screen registered in each role's navigator)
+  const onCenterPress = () => (navigation as any).navigate('AiAssistant');
 
   return (
     <View style={{ backgroundColor: colors.bg, paddingHorizontal: 14, paddingBottom: Math.max(insets.bottom, 10) }}>
@@ -139,7 +137,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             <Pressable
               onPress={onCenterPress}
               accessibilityRole="button"
-              accessibilityLabel="Home"
+              accessibilityLabel="Open WonPet AI chat"
               style={{
                 width: CENTER_SIZE, height: CENTER_SIZE, borderRadius: CENTER_SIZE / 2, overflow: 'hidden',
                 alignItems: 'center', justifyContent: 'center',

@@ -35,6 +35,8 @@ import ChatScreen from '../screens/main/ChatScreen';
 import ChatThreadScreen from '../screens/main/ChatThreadScreen';
 import SearchScreen from '../screens/main/SearchScreen';
 import VideoCallScreen from '../screens/main/VideoCallScreen';
+import AssistantScreen from '../screens/main/AssistantScreen';
+import LegalScreen from '../screens/legal/LegalScreen';
 
 const Stack = createNativeStackNavigator();
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.bg, primary: colors.primary } };
@@ -59,11 +61,14 @@ export default function RootNavigator() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="Otp" component={OtpScreen} />
+            <Stack.Screen name="Legal" component={LegalScreen} options={{ headerShown: true, title: 'Terms & Policies', headerTintColor: colors.text }} />
           </>
         ) : isManaged ? (
           // "Shared With Me" mode: only the shared pets' screens (the owner's own stack is not mounted)
           <>
             <Stack.Screen name="SharedMain" component={SharedTabs} />
+            <Stack.Screen name="Legal" component={LegalScreen} options={{ headerShown: true, title: 'Terms & Policies', headerTintColor: colors.text }} />
+            <Stack.Screen name="AiAssistant" component={AssistantScreen} options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: true, title: 'Messages', headerTintColor: colors.text }} />
             <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
             <Stack.Screen name="Search" component={SearchScreen} options={{ headerShown: true, title: 'Search', headerTintColor: colors.text }} />
@@ -71,6 +76,8 @@ export default function RootNavigator() {
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Legal" component={LegalScreen} options={{ headerShown: true, title: 'Terms & Policies', headerTintColor: colors.text }} />
+            <Stack.Screen name="AiAssistant" component={AssistantScreen} options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PetProfile" component={PetProfileScreen} options={{ headerShown: true, title: 'Pet Profile', headerTintColor: colors.text }} />
             <Stack.Screen name="AddPet" component={AddPetScreen} options={{ headerShown: true, title: 'Add New Pet', headerTintColor: colors.text }} />

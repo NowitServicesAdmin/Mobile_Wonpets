@@ -28,12 +28,12 @@ type Icon = keyof typeof Ionicons.glyphMap;
 type QuickAction = { title: string; icon: Icon; tone: DTone; go?: string; params?: object; action?: 'consultation' };
 /** Same six shortcuts, in the same order, as the web dashboard's "Quick Actions" panel. */
 const QUICK: QuickAction[] = [
-  { title: 'Set Availability', icon: 'calendar', tone: 'orange', go: 'Availability' },
-  { title: 'Start Consultation', icon: 'videocam', tone: 'green', action: 'consultation' },
-  { title: 'Add Prescription', icon: 'document-text', tone: 'pink', go: 'Prescriptions' },
-  { title: 'Manage Treatment', icon: 'heart', tone: 'red', go: 'FollowUps' },
+  { title: 'Availability', icon: 'calendar', tone: 'orange', go: 'Availability' },
+  { title: 'Consultation', icon: 'videocam', tone: 'green', action: 'consultation' },
+  { title: 'Prescription', icon: 'document-text', tone: 'pink', go: 'Prescriptions' },
+  { title: 'Follow-ups', icon: 'heart', tone: 'red', go: 'FollowUps' },
   { title: 'Collaborations', icon: 'people', tone: 'blue', go: 'DoctorProfile', params: { open: 'shared' } },
-  { title: 'View Medical Records', icon: 'folder-open', tone: 'purple', go: 'MedicalRecords' },
+  { title: 'Medical Records', icon: 'folder-open', tone: 'purple', go: 'MedicalRecords' },
 ];
 
 /** Same labels / colours the web uses for a patient's latest appointment status. */
@@ -220,12 +220,12 @@ export default function DoctorHomeScreen({ navigation }: any) {
 
   if (dash.loading && !d) return <DashboardSkeleton />;
 
-  const stats: { title: string; caption: string; value: number; icon: Icon; tone: DTone; go: () => void }[] = [
-    { title: 'Today', caption: 'Scheduled today', value: d?.stats.today ?? 0, icon: 'cube', tone: 'orange', go: () => navigation.navigate('DoctorSchedule') },
-    { title: 'Completed', caption: 'All completed cases', value: d?.stats.completed ?? 0, icon: 'checkmark-circle', tone: 'green', go: () => navigation.navigate('DoctorSchedule', { tab: 'past' }) },
-    { title: 'Pending', caption: 'Awaiting appointments', value: d?.stats.pending ?? 0, icon: 'time', tone: 'purple', go: () => navigation.navigate('DoctorSchedule', { tab: 'requests' }) },
-    { title: 'Cancelled', caption: 'No cancellations', value: d?.stats.cancelled ?? 0, icon: 'close-circle', tone: 'blue', go: () => navigation.navigate('DoctorSchedule', { tab: 'past' }) },
-  ];
+  // const stats: { title: string; caption: string; value: number; icon: Icon; tone: DTone; go: () => void }[] = [
+  //   { title: 'Today', caption: 'Scheduled today', value: d?.stats.today ?? 0, icon: 'cube', tone: 'orange', go: () => navigation.navigate('DoctorSchedule') },
+  //   { title: 'Completed', caption: 'All completed cases', value: d?.stats.completed ?? 0, icon: 'checkmark-circle', tone: 'green', go: () => navigation.navigate('DoctorSchedule', { tab: 'past' }) },
+  //   { title: 'Pending', caption: 'Awaiting appointments', value: d?.stats.pending ?? 0, icon: 'time', tone: 'purple', go: () => navigation.navigate('DoctorSchedule', { tab: 'requests' }) },
+  //   { title: 'Cancelled', caption: 'No cancellations', value: d?.stats.cancelled ?? 0, icon: 'close-circle', tone: 'blue', go: () => navigation.navigate('DoctorSchedule', { tab: 'past' }) },
+  // ];
   const month = d?.monthStats;
   const monthCards: { label: string; value: string | number; icon: Icon; tone: DTone }[] = [
     { label: 'Visits', value: month?.visits ?? 0, icon: 'calendar', tone: 'orange' },
@@ -247,7 +247,7 @@ export default function DoctorHomeScreen({ navigation }: any) {
         onNext={() => next && open(next)} onEarnings={() => navigation.navigate('Earnings')} />
 
       {/* stat cards - one row */}
-      <CompactStatRow stats={stats.map((st) => ({ title: st.title, value: st.value, icon: st.icon, tone: st.tone, onPress: st.go }))} />
+      {/* <CompactStatRow stats={stats.map((st) => ({ title: st.title, value: st.value, icon: st.icon, tone: st.tone, onPress: st.go }))} /> */}
 
       {/* new booking requests - the first one here, the rest in the schedule */}
       {requests.length > 0 && (

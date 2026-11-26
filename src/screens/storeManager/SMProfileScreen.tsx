@@ -17,32 +17,35 @@ import { Badge } from '../../components/storeManager/SMUI';
 import DocumentsSection from '../../components/settings/DocumentsSection';
 import SubscriptionSection from '../../components/settings/SubscriptionSection';
 import NotificationsSection from '../../components/settings/NotificationsSection';
-import LanguageSection from '../../components/settings/LanguageSection';
+import InviteSection from '../../components/settings/InviteSection';
 import FaqSection from '../../components/settings/FaqSection';
 import ContactSection from '../../components/settings/ContactSection';
+import LegalSection from '../../components/settings/LegalSection';
+import { versionFooter } from '../../config/version';
 import { STORE_DOCUMENT_TYPES, STORE_FAQS, STORE_NOTIFICATION_KEYS } from '../../data/settings';
 import { KycStatus, kycService } from '../../services/kyc.service';
 import { Pickup, smService } from '../../services/storeManager.service';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import { useLanguage } from '../../context/LanguageContext';
 import { useStoreManager } from '../../context/StoreManagerContext';
 import { headerLocation } from '../../utils/location';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type Key = 'profile' | 'store' | 'pickup' | 'kyc' | 'subscription' | 'documents' | 'prefs' | 'language' | 'faq' | 'support';
+type Key = 'profile' | 'store' | 'pickup' | 'kyc' | 'subscription' | 'documents' | 'prefs' | 'invite' | 'faq' | 'support' | 'legal';
 
+/** Same sections, names and order as the web Settings page for a store manager. */
 const sections: Record<Key, { title: string; icon: IconName }> = {
   profile: { title: 'Profile', icon: 'person-outline' },
-  store: { title: 'Store details', icon: 'storefront-outline' },
-  pickup: { title: 'Courier pickup', icon: 'cube-outline' },
-  kyc: { title: 'KYC & payouts', icon: 'card-outline' },
+  prefs: { title: 'Notifications', icon: 'notifications-outline' },
+  store: { title: 'Additional Information', icon: 'storefront-outline' },
   subscription: { title: 'Subscription', icon: 'card-outline' },
+  kyc: { title: 'KYC Details', icon: 'card-outline' },
+  pickup: { title: 'Pickup Address', icon: 'cube-outline' },
   documents: { title: 'Documents', icon: 'document-text-outline' },
-  prefs: { title: 'Notification settings', icon: 'notifications-outline' },
-  language: { title: 'Language', icon: 'language-outline' },
-  faq: { title: 'Frequently Asked Questions', icon: 'help-circle-outline' },
+  invite: { title: 'Invite', icon: 'person-add-outline' },
+  faq: { title: 'FAQ', icon: 'help-circle-outline' },
   support: { title: 'Contact & Support', icon: 'headset-outline' },
+  legal: { title: 'Terms & Policies', icon: 'shield-checkmark-outline' },
 };
 const toKey = (k?: string): Key | null => (k && k in sections ? (k as Key) : null);
 // sections that draw their own cards
@@ -54,31 +57,26 @@ type Item =
   | { kind: 'route'; route: string; title: string; hint: string; icon: IconName; tone: MenuTone };
 const page = (key: Key, hint: string, tone: MenuTone): Item => ({ kind: 'page', key, title: sections[key].title, hint, icon: sections[key].icon, tone });
 
-const STORE: Item[] = [
-  page('store', 'Store name, category, GST, address', 'orange'),
-  page('pickup', 'Where couriers collect your parcels', 'blue'),
-  { kind: 'route', route: 'SMEarnings', title: 'Earnings', hint: 'Revenue, payouts and transactions', icon: 'wallet-outline', tone: 'green' },
-  { kind: 'route', route: 'SMReports', title: 'Reports & analytics', hint: 'Sales trends and exports', icon: 'bar-chart-outline', tone: 'purple' },
-];
-const ACCOUNT: Item[] = [
-  page('kyc', 'Bank details to receive payouts', 'green'),
-  page('subscription', 'Plans & billing', 'purple'),
-  page('documents', 'Business licence, GST, identity', 'purple'),
-];
-const PREFS: Item[] = [
+const LIST: Item[] = [
   page('prefs', 'Order emails and alerts', 'yellow'),
-  page('language', 'Choose the language the app is shown in', 'blue'),
+  page('store', 'Store name, category, GST, address', 'orange'),
+  page('subscription', 'Plans & billing', 'purple'),
+  page('kyc', 'Bank details to receive payouts', 'green'),
+  page('pickup', 'Where couriers collect your parcels', 'blue'),
+  page('documents', 'Business licence, GST, identity', 'purple'),
+  page('invite', 'Invite friends to WONPET', 'orange'),
+  page('faq', 'Quick answers', 'purple'),
+  page('support', 'We are here to help', 'green'),
+  page('legal', 'Terms, privacy, refund & versions', 'blue'),
 ];
-const HELP: Item[] = [page('faq', 'Quick answers', 'purple'), page('support', 'We are here to help', 'green')];
 
 /** Profile tab for store managers - same layout as the owner / doctor Profile: a profile card, grouped rows,
- *  each row opens as its own page inside the tab. Open with { open: 'kyc' } (any key) to jump to a section. */
+ *  each row opens as its own page inside the tab (web Settings sections). Open with { open: 'kyc' } (any key) to jump to a section. */
 export default function SMProfileScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const { user, signOut } = useAuth();
   const { info, documents, ready, subscription, expiredPlan, plans } = useSettings();
-  const { language } = useLanguage();
   const { tick } = useStoreManager();
   const [open, setOpen] = useState<Key | null>(toKey(route.params?.open));
   const [kyc, setKyc] = useState<KycStatus | null>(null);
@@ -106,20 +104,12 @@ export default function SMProfileScreen({ navigation, route }: any) {
     if (r.isConfirmed) signOut();
   };
 
-  const todo: { key: Key; label: string }[] = [];
-  if (!user?.email || !user?.phone) todo.push({ key: 'profile', label: !user?.email ? 'Add email' : 'Add mobile' });
-  if (ready && (!info.storeName?.trim() || !info.location)) todo.push({ key: 'store', label: 'Store details' });
-  if (ready && STORE_DOCUMENT_TYPES.some((d) => !documents[d.key])) todo.push({ key: 'documents', label: 'Upload documents' });
-  if (kyc && kyc !== 'activated' && kyc !== 'under_review') todo.push({ key: 'kyc', label: 'Complete KYC' });
-  if (pickup === 'failed' || pickup === 'pending_verification') todo.push({ key: 'pickup', label: 'Check pickup address' });
-
   const docsDone = STORE_DOCUMENT_TYPES.filter((d) => documents[d.key]).length;
   const rowValue = (it: Item): { text?: string; chip?: { label: string; tone: Tone } ; badge?: { label: string; tone: 'slate' | 'amber' | 'green' | 'red' } } => {
     if (it.kind !== 'page') return {};
     if (it.key === 'kyc' && kyc) return { chip: KYC_STATUS[kyc] };
     if (it.key === 'pickup' && pickup) return { badge: PICKUP_STATUS[pickup] };
     if (it.key === 'documents' && ready) return { text: `${docsDone}/${STORE_DOCUMENT_TYPES.length}` };
-    if (it.key === 'language') return { text: language.label };
     if (it.key === 'subscription' && ready) return subscription ? { text: plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId } : expiredPlan ? { chip: { label: 'Ended', tone: 'red' as Tone } } : { text: 'Free' };
     return {};
   };
@@ -129,8 +119,8 @@ export default function SMProfileScreen({ navigation, route }: any) {
     const v = rowValue(it);
     return (
       <Pressable key={it.kind === 'page' ? it.key : it.route} onPress={() => (it.kind === 'page' ? setOpen(it.key) : navigation.navigate(it.route))}
-        accessibilityRole="button" accessibilityLabel={it.title} className={cn('flex-row items-center gap-3 px-3.5 py-3 active:bg-cream', index > 0 && 'border-t border-line')}>
-        <View className={cn('w-10 h-10 rounded-xl items-center justify-center', t.box)}><Ionicons name={it.icon} size={19} color={t.fg} /></View>
+        accessibilityRole="button" accessibilityLabel={it.title} className={cn('flex-row items-center gap-3 px-3 py-2.5 active:bg-cream', index > 0 && 'border-t border-line')}>
+        <View className={cn('w-9 h-9 rounded-xl items-center justify-center', t.box)}><Ionicons name={it.icon} size={19} color={t.fg} /></View>
         <View className="flex-1">
           <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-[15px] font-extrabold text-ink">{it.title}</Text>
           <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="text-[12px] text-muted">{it.hint}</Text>
@@ -142,13 +132,6 @@ export default function SMProfileScreen({ navigation, route }: any) {
       </Pressable>
     );
   };
-  const group = (title: string, items: Item[]) => (
-    <View key={title}>
-      <Text maxFontSizeMultiplier={1.1} className="text-[12px] font-extrabold text-muted uppercase tracking-wider mb-1.5 ml-2">{title}</Text>
-      <View className="bg-white rounded-3xl border border-line overflow-hidden">{items.map(renderRow)}</View>
-    </View>
-  );
-
   const body = () => {
     if (!open) return null;
     if (!ready && SERVER_BACKED.includes(open)) return <Card className="border-line"><FormSkeleton fields={3} /></Card>;
@@ -160,9 +143,10 @@ export default function SMProfileScreen({ navigation, route }: any) {
       subscription: <SubscriptionSection />,
       documents: <DocumentsSection types={STORE_DOCUMENT_TYPES} />,
       prefs: <NotificationsSection only={STORE_NOTIFICATION_KEYS} />,
-      language: <LanguageSection />,
+      invite: <InviteSection />,
       faq: <FaqSection fallback={STORE_FAQS} />,
       support: <ContactSection />,
+      legal: <LegalSection />,
     }[open];
     return NO_CARD.includes(open) ? el : <Card className="border-line">{el}</Card>;
   };
@@ -176,12 +160,12 @@ export default function SMProfileScreen({ navigation, route }: any) {
               <Ionicons name="arrow-back" size={19} color={colors.text} />
             </Pressable>
           ) : <View className="w-[38px]" />}
-          <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="flex-1 text-center text-[19px] font-black text-ink px-2">{open ? sections[open].title : 'Profile'}</Text>
+          <Text maxFontSizeMultiplier={1.1} numberOfLines={1} className="flex-1 text-center text-[19px] font-black text-ink px-2">{open ? sections[open].title : 'Settings'}</Text>
           <View className="w-[38px]" />
         </View>
       </View>
 
-      <ScrollView ref={scroll} className="flex-1" contentContainerClassName="p-4 gap-3.5 pb-10" keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroll} className="flex-1" contentContainerClassName="p-3 gap-2.5 pb-4" keyboardShouldPersistTaps="handled">
         {open ? body() : (
           <>
             <Pressable onPress={() => setOpen('profile')} accessibilityRole="button" accessibilityLabel="Edit profile" className="flex-row items-center gap-3 bg-white rounded-3xl border border-line p-3.5 active:opacity-80">
@@ -202,23 +186,13 @@ export default function SMProfileScreen({ navigation, route }: any) {
               <Ionicons name="chevron-forward" size={20} color={colors.muted} />
             </Pressable>
 
-            {todo.length > 0 && (
-              <View className="bg-primary-soft rounded-3xl border border-line p-3.5 gap-2.5">
-                <View className="flex-row items-center gap-2"><Ionicons name="sparkles-outline" size={16} color={colors.primary} /><Text className="flex-1 text-[14px] font-extrabold text-ink">Finish setting up your store</Text></View>
-                <View className="flex-row flex-wrap gap-2">{todo.map((t) => <Chip key={t.key} tone="white" label={`+ ${t.label}`} onPress={() => setOpen(t.key)} />)}</View>
-              </View>
-            )}
-
-            {group('Your store', STORE)}
-            {group('Account', ACCOUNT)}
-            {group('Preferences', PREFS)}
-            {group('Help & Support', HELP)}
+            <View className="bg-white rounded-2xl border border-line overflow-hidden">{LIST.map(renderRow)}</View>
 
             <Pressable onPress={logout} accessibilityRole="button" accessibilityLabel="Logout" className="flex-row items-center justify-center gap-2 bg-red-soft border border-red/20 rounded-2xl py-3.5 active:opacity-80">
               <Ionicons name="log-out-outline" size={19} color={colors.red} />
               <Text className="text-red font-extrabold text-[15px]">Logout</Text>
             </Pressable>
-            <Text className="text-center text-xs text-muted">WON PET STORE · v1.1.0</Text>
+            <Text className="text-center text-xs text-muted">{versionFooter('WON PET STORE')}</Text>
           </>
         )}
       </ScrollView>

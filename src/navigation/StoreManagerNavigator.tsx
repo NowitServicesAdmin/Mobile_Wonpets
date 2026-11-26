@@ -13,10 +13,12 @@ import SMReviewsScreen from '../screens/storeManager/SMReviewsScreen';
 import SMOffersScreen from '../screens/storeManager/SMOffersScreen';
 import SMOfferFormScreen from '../screens/storeManager/SMOfferFormScreen';
 import SMReportsScreen from '../screens/storeManager/SMReportsScreen';
-import SMEarningsScreen from '../screens/storeManager/SMEarningsScreen';
+import SMOrdersScreen from '../screens/storeManager/SMOrdersScreen';
 // shared with the owner / doctor apps
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import SearchScreen from '../screens/main/SearchScreen';
+import AssistantScreen from '../screens/main/AssistantScreen';
+import LegalScreen from '../screens/legal/LegalScreen';
 
 const Stack = createNativeStackNavigator();
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.bg, primary: colors.primary } };
@@ -28,17 +30,19 @@ export default function StoreManagerNavigator() {
     <NavigationContainer theme={theme}>
       <Stack.Navigator screenOptions={{ headerShown: false, headerStyle: { backgroundColor: colors.bg }, headerShadowVisible: false, headerTitleStyle: { fontWeight: '800', fontSize: 18, color: colors.text } }}>
         <Stack.Screen name="SMMain" component={StoreManagerTabs} />
+        <Stack.Screen name="Legal" component={LegalScreen} options={page('Terms & Policies')} />
+        <Stack.Screen name="AiAssistant" component={AssistantScreen} options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SMProducts" component={SMProductsScreen} options={({ route }: any) => page(route.params?.categoryName || 'Products')} />
         <Stack.Screen name="SMProductForm" component={SMProductFormScreen} options={page('Add Product')} />
         <Stack.Screen name="SMCategories" component={SMCategoriesScreen} options={page('Categories')} />
         <Stack.Screen name="SMInventory" component={SMInventoryScreen} options={page('Inventory')} />
+        <Stack.Screen name="SMOrders" component={SMOrdersScreen} options={page('Orders')} />
         <Stack.Screen name="SMOrderDetail" component={SMOrderDetailScreen} options={page('Order Details')} />
         <Stack.Screen name="SMCustomers" component={SMCustomersScreen} options={page('Customers')} />
         <Stack.Screen name="SMReviews" component={SMReviewsScreen} options={page('Reviews')} />
         <Stack.Screen name="SMOffers" component={SMOffersScreen} options={page('Coupons & Offers')} />
         <Stack.Screen name="SMOfferForm" component={SMOfferFormScreen} options={page('Create Offer')} />
         <Stack.Screen name="SMReports" component={SMReportsScreen} options={page('Reports & Analytics')} />
-        <Stack.Screen name="SMEarnings" component={SMEarningsScreen} options={page('Earnings')} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={page('Notifications')} />
         <Stack.Screen name="Search" component={SearchScreen} options={page('Search')} />
       </Stack.Navigator>

@@ -54,7 +54,7 @@ export const DOCTOR_PAGES: SearchPage[] = [
 
 export const STORE_MANAGER_PAGES: SearchPage[] = [
   { title: 'Dashboard', keywords: 'home overview', icon: 'grid-outline', go: smTab('SMHome') },
-  { title: 'Orders', keywords: 'shipments delivery customers order', icon: 'receipt-outline', go: smTab('SMOrders') },
+  { title: 'Orders', keywords: 'shipments delivery customers order', icon: 'receipt-outline', go: { name: 'SMOrders' } },
   { title: 'Products', keywords: 'catalog items', icon: 'cube-outline', go: { name: 'SMProducts' } },
   { title: 'Categories', keywords: 'category', icon: 'albums-outline', go: { name: 'SMCategories' } },
   { title: 'Inventory', keywords: 'stock', icon: 'layers-outline', go: { name: 'SMInventory' } },
@@ -62,7 +62,7 @@ export const STORE_MANAGER_PAGES: SearchPage[] = [
   { title: 'Reviews', keywords: 'ratings feedback', icon: 'star-outline', go: { name: 'SMReviews' } },
   { title: 'Offers', keywords: 'coupons discounts', icon: 'pricetag-outline', go: { name: 'SMOffers' } },
   { title: 'Reports', keywords: 'analytics export', icon: 'bar-chart-outline', go: { name: 'SMReports' } },
-  { title: 'Earnings', keywords: 'income payout revenue', icon: 'trending-up-outline', go: { name: 'SMEarnings' } },
+  { title: 'Earnings', keywords: 'income payout revenue', icon: 'trending-up-outline', go: smTab('SMEarnings') },
   { title: 'Notifications', keywords: 'alerts', icon: 'notifications-outline', go: { name: 'Notifications' } },
   { title: 'Settings', keywords: 'profile account kyc pickup', icon: 'person-outline', go: smTab('SMProfile') },
 ];
