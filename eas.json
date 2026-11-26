@@ -11,8 +11,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://YOUR-API-DOMAIN/api",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "EXPO_PUBLIC_API_URL": "https://api.wonpetpro.com/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "349450280890-urs1svl8pijf3fdke6k75sgnjvb34t7m.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -21,18 +21,31 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://YOUR-API-DOMAIN/api",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "EXPO_PUBLIC_API_URL": "https://YOUR-STAGING-API-DOMAIN/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "349450280890-urs1svl8pijf3fdke6k75sgnjvb34t7m.apps.googleusercontent.com"
       }
     },
     "production": {
+      "distribution": "store",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://YOUR-API-DOMAIN/api",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "EXPO_PUBLIC_API_URL": "https://api.wonpetpro.com/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "349450280890-urs1svl8pijf3fdke6k75sgnjvb34t7m.apps.googleusercontent.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {
+        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID"
       }
     }
   }

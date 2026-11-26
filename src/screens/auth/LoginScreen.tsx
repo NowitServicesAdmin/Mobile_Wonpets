@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
-import { AUTH, GradientButton, GoogleButton, AppleButton } from "../../components/auth/AuthUI";
+import { AUTH, GradientButton } from "../../components/auth/AuthUI";
+import SocialSignInRow from "../../components/auth/SocialSignInRow";
 import IdentifierField from "../../components/IdentifierField";
-import GoogleSignInButton, { googleConfigured } from "../../components/GoogleSignInButton";
 import { WonPetsAlert, toast } from "../../components/WonPetsAlert";
 import { useAuth } from "../../context/AuthContext";
 import { COUNTRIES, parseIdentifier } from "../../utils/identifier";
@@ -17,15 +17,15 @@ export default function LoginScreen({ navigation }: any) {
   const [value, setValue] = useState("");
   const [country, setCountry] = useState(COUNTRIES[0]);
   const [busy, setBusy] = useState(false);
-  const [appleAvailable, setAppleAvailable] = useState(false);
   const parsed = parseIdentifier(value, country);
 
-  // Only show "Continue with Apple" where the device can actually do it (iOS 13+).
+  // Dev only: log whether this device reports Apple sign-in as available.
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
-    AppleAuthentication.isAvailableAsync()
-      .then(setAppleAvailable)
-      .catch(() => setAppleAvailable(false));
+    if (__DEV__ && Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync()
+        .then((ok) => console.log("[APPLE] available on this device:", ok))
+        .catch((err) => console.log("[APPLE] availability check failed:", err));
+    }
   }, []);
 
   const sendOtp = async (restore = false) => {
@@ -111,6 +111,15 @@ export default function LoginScreen({ navigation }: any) {
       else if (res.restored) toast.success("Welcome back! Your account has been restored.");
     } catch (e: any) {
       if (e?.code === "ERR_REQUEST_CANCELED") return; // user dismissed the Apple sheet
+      if (__DEV__) console.log("[APPLE] sign-in error:", e?.code, e?.message);
+      if (
+        e?.code === "ERR_REQUEST_UNKNOWN" ||
+        e?.code === "ERR_REQUEST_NOT_HANDLED" ||
+        e?.code === "ERR_REQUEST_NOT_INTERACTIVE"
+      ) {
+        toast.error("Apple sign-in couldn't start. Make sure you're signed in to iCloud and that this build has Sign in with Apple enabled.");
+        return;
+      }
       if ((e as ApiError).code === PENDING_DELETION) {
         setBusy(false);
         const answer = await askToRestore(errorMessage(e));
@@ -150,12 +159,7 @@ export default function LoginScreen({ navigation }: any) {
         </View>
         <View style={{ flex: 1, height: 1, backgroundColor: AUTH.border }} />
       </View>
-      {googleConfigured ? (
-        <GoogleSignInButton onToken={onGoogle} disabled={busy} />
-      ) : (
-        <GoogleButton onPress={() => toast.info("Google sign-in isn't configured yet. Add the EXPO_PUBLIC_GOOGLE_* ids in .env.")} />
-      )}
-      {appleAvailable && <AppleButton onPress={() => onApple()} disabled={busy} />}
+      <SocialSignInRow onGoogleToken={onGoogle} onApple={() => onApple()} disabled={busy} />
     </AuthLayout>
   );
 }
