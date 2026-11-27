@@ -79,9 +79,6 @@ export const appointmentsService = {
     const { data } = await api.put(`/appointments/${id}/reschedule`, { date, time });
     return mapAppointment(data.appointment);
   },
-  async cancel(id: string) {
-    await api.put(`/appointments/${id}/cancel`);
-  },
 };
 
 export type PrescriptionView = {

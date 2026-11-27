@@ -53,8 +53,6 @@ type Ctx = {
   refreshOrders: () => Promise<void>;
   /** Inserts or replaces one order (e.g. the full order loaded by the detail screen). */
   upsertOrder: (o: Order) => void;
-  /** Resolves true when the order was cancelled. */
-  cancelOrder: (id: string) => Promise<boolean>;
   /** COD places it straight away; Online Payment opens Razorpay first. Throws on failure / cancel. */
   placeOrder: (a: PlaceOrderArgs) => Promise<Order>;
 };
@@ -244,17 +242,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setOrders((list) => (list.some((x) => x.id === o.id) ? list.map((x) => (x.id === o.id ? { ...x, ...o } : x)) : [o, ...list]));
   }, []);
 
-  const cancelOrder: Ctx['cancelOrder'] = async (id) => {
-    try {
-      await ordersService.cancel(id);
-      setOrders((list) => list.map((o) => (o.id === id ? { ...o, status: 'Cancelled' } : o)));
-      refreshOrders();
-      return true;
-    } catch (e) {
-      toast.error(errorMessage(e, 'Could not cancel the order.'));
-      return false;
-    }
-  };
+  // Customers can't cancel a placed order (the server refuses it) - the store manager can.
 
   const placeOrder: Ctx['placeOrder'] = async ({ addressId, payment, expectedTotal }) => {
     let order: Order;
@@ -306,7 +294,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     couponCode, discount, offers, applyCoupon, removeCoupon,
     wishlist, wishlistProducts, toggleWishlist,
     addresses, selectedAddressId, setSelectedAddressId, saveAddress, refreshAddresses,
-    orders, refreshOrders, upsertOrder, cancelOrder, placeOrder,
+    orders, refreshOrders, upsertOrder, placeOrder,
   };
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

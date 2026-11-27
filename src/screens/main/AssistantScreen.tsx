@@ -68,7 +68,7 @@ const QUICK: Record<AppRole, Quick[]> = {
     { title: 'Pet Store', icon: 'bag-handle-outline', prompt: 'Show pet products' },
     { title: 'My Orders', icon: 'receipt-outline', prompt: 'Track my order' },
     { title: 'Reschedule', icon: 'calendar-number-outline', prompt: 'Reschedule my appointment' },
-    { title: 'Cancel Visit', icon: 'close-circle-outline', prompt: 'Cancel my appointment' },
+    { title: 'My Visits', icon: 'list-outline', prompt: 'Show my appointments' },
   ],
   doctor: [
     { title: "Today's Appointments", icon: 'calendar-outline', prompt: "Show today's appointments" },
@@ -88,14 +88,14 @@ const QUICK: Record<AppRole, Quick[]> = {
   ],
 };
 const SUGGESTED: Record<AppRole, string[]> = {
-  user: ['My appointments', 'Cancel appointment', 'Reschedule appointment', 'Find nearby doctor', 'Track my order', 'Best food for puppies', 'Adopt a pet'],
+  user: ['My appointments', 'Reschedule appointment', 'Find nearby doctor', 'Track my order', 'Best food for puppies', 'Adopt a pet'],
   doctor: ["Today's appointments", 'Pending approvals', 'Upcoming consultations', 'Follow-up reminders', 'Vaccination guidelines', 'Prescription template'],
   store_manager: ['Pending orders', 'Low stock products', 'Best selling products', 'Inventory report', 'Customer reviews', 'Unanswered questions'],
 };
 
 /* ------------------------------ in-chat actions ------------------------------
- * Everything the web WonPet AI finishes inside the chat is finished here too: booking (pay included), cancel /
- * reschedule, add to cart, doctor approvals and consultation steps, store order handling and stock updates.
+ * Everything the web WonPet AI finishes inside the chat is finished here too: booking (pay included),
+ * reschedule (booked appointments can't be cancelled), add to cart, doctor approvals and consultation steps, store order handling and stock updates.
  * They call the same endpoints as the normal screens, so slot locking, fees and payment checks stay on the server. */
 type Widget = { kind: 'cancel' | 'resched' | 'dr_pending' | 'dr_today' | 'sm_orders' | 'sm_stock' };
 
@@ -284,10 +284,9 @@ function BookingFlow({ pets, user, addBot, addUser, onEnd, onBooked }: {
   );
 }
 
-/* ------------------------------ pet owner: cancel / reschedule ------------------------------ */
-function OwnerAppointmentCards({ kind, cancelAppointment, rescheduleAppointment }: {
-  kind: 'cancel' | 'resched';
-  cancelAppointment?: (id: string) => Promise<boolean>; rescheduleAppointment?: (id: string, p: { isoDate: string; time: string }) => Promise<boolean>;
+/* ------------------------------ pet owner: reschedule (cancelling is not allowed) ------------------------------ */
+function OwnerAppointmentCards({ rescheduleAppointment }: {
+  rescheduleAppointment?: (id: string, p: { isoDate: string; time: string }) => Promise<boolean>;
 }) {
   const [items, setItems] = useState<Appointment[] | null>(null);
   const [err, setErr] = useState('');
@@ -300,10 +299,6 @@ function OwnerAppointmentCards({ kind, cancelAppointment, rescheduleAppointment 
       (e) => setErr(errorMessage(e)),
     );
   }, []);
-  const doCancel = (a: Appointment) => Alert.alert('Cancel appointment?', `${a.pet} with ${a.doctor ?? 'the vet'} on ${a.date}, ${a.time}.`, [
-    { text: 'Keep it', style: 'cancel' },
-    { text: 'Cancel appointment', style: 'destructive', onPress: async () => { setBusy(a.id); const ok = await cancelAppointment?.(a.id); setBusy(null); if (ok) setDone((d) => ({ ...d, [a.id]: '✓ Appointment cancelled' })); } },
-  ]);
   const doResched = async (a: Appointment, date: string, time: string) => {
     setBusy(a.id);
     const ok = await rescheduleAppointment?.(a.id, { isoDate: date, time });
@@ -314,10 +309,8 @@ function OwnerAppointmentCards({ kind, cancelAppointment, rescheduleAppointment 
     <Panel>
       {err ? <Note text={err} /> : !items ? <Loading /> : !items.length ? <Note text="You have no upcoming appointments to change." /> : items.map((a) => (
         <Row key={a.id} title={`${a.pet} • ${a.doctor ?? 'Vet'}`} sub={`${a.date}, ${a.time} • ${a.mode} • ${a.status}`} done={done[a.id]}>
-          {kind === 'cancel'
-            ? <Pill danger disabled={busy === a.id} label={busy === a.id ? 'Cancelling...' : 'Cancel appointment'} onPress={() => doCancel(a)} />
-            : <Pill disabled={busy === a.id || !a.doctorId} label={open === a.id ? 'Close' : 'Choose new time'} onPress={() => setOpen(open === a.id ? null : a.id)} />}
-          {kind === 'resched' && open === a.id && !!a.doctorId && <View style={{ width: '100%' }}><SlotChooser doctorId={a.doctorId} onPick={(d, t) => doResched(a, d, t)} /></View>}
+          <Pill disabled={busy === a.id || !a.doctorId} label={open === a.id ? 'Close' : 'Choose new time'} onPress={() => setOpen(open === a.id ? null : a.id)} />
+          {open === a.id && !!a.doctorId && <View style={{ width: '100%' }}><SlotChooser doctorId={a.doctorId} onPick={(d, t) => doResched(a, d, t)} /></View>}
         </Row>
       ))}
     </Panel>
@@ -626,7 +619,8 @@ export default function AssistantScreen({ navigation }: any) {
       return;
     }
     if (act.local === 'cancel' || act.local === 'resched') {
-      addBot(act.local === 'cancel' ? 'Here are your upcoming appointments. Tap one to cancel it.' : 'Here are your upcoming appointments. Tap one to pick a new day and time.', { widget: act.local });
+      // booked appointments can't be cancelled - offer a new time instead
+      addBot(act.local === 'cancel' ? "Booked appointments can't be cancelled, but you can move one to another day. Tap an appointment to pick a new time." : 'Here are your upcoming appointments. Tap one to pick a new day and time.', { widget: 'resched' });
       return;
     }
 
@@ -654,7 +648,7 @@ export default function AssistantScreen({ navigation }: any) {
     ? async (p: AssistantProduct) => { if (await cartCtx.addToCart(p.id, 1)) { toast.success(`${p.name} added to cart`); addBot(`Added **${p.name}** to your cart.`, { links: [{ label: 'View cart', path: '/owner/store/cart' }, { label: 'Checkout', path: '/owner/store/checkout' }] }); } }
     : undefined;
   const renderWidget = (kind: Widget['kind']) => {
-    if (kind === 'cancel' || kind === 'resched') return <OwnerAppointmentCards kind={kind} cancelAppointment={petsCtx?.cancelAppointment} rescheduleAppointment={petsCtx?.rescheduleAppointment} />;
+    if (kind === 'cancel' || kind === 'resched') return <OwnerAppointmentCards rescheduleAppointment={petsCtx?.rescheduleAppointment} />;
     if (kind === 'dr_pending' || kind === 'dr_today') return <DoctorAppointmentCards kind={kind} />;
     if (kind === 'sm_orders') return <StoreOrderCards />;
     return <StoreStockCards />;

@@ -184,9 +184,6 @@ export const ordersService = {
     const { data } = await api.post('/orders/payment/verify', p, { timeout: 40000 });
     return mapOrder(data.order);
   },
-  async cancel(id: string) {
-    await api.patch(`/orders/${id}/cancel`);
-  },
   async tracking(id: string): Promise<{ status: string; activities: { activity: string; location: string; time: string }[] }> {
     const { data } = await api.get(`/orders/${id}/tracking`);
     return {

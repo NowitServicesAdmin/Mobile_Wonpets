@@ -7,13 +7,12 @@ import { Button, Card, Chip, Empty, T } from '../../components/ui';
 import { OrderDetailSkeleton } from '../../components/Skeletons';
 import OrderTimeline from '../../components/store/OrderTimeline';
 import ShipmentTracking from '../../components/store/ShipmentTracking';
-import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
 import { ordersService } from '../../services/store.service';
 import { useCart } from '../../context/CartContext';
 import { fmtDateTime, inr, statusTone } from '../../utils/orders';
 
 export default function OrderDetailScreen({ route, navigation }: any) {
-  const { orders, cancelOrder, upsertOrder } = useCart();
+  const { orders, upsertOrder } = useCart();
   const order = orders.find((o) => o.id === route.params.id);
   const [fetched, setFetched] = useState(false);
   const { tick } = useLiveSync();
@@ -34,13 +33,6 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     })();
   }, [route.params.id, tick]); // tick: live sync re-fetches the order so status / courier updates appear on their own
   if (!order) return fetched ? <View className="flex-1 bg-cream justify-center"><Empty emoji="📦" title="Order not found" body="We couldn't load this order. Pull back and try again." /></View> : <OrderDetailSkeleton />;
-  const canCancel = order.status === 'Pending' || order.status === 'Processing';
-
-  const onCancel = async () => {
-    const r = await WonPetsAlert.confirm('Cancel this order?', 'The store will stop preparing it. This cannot be undone.', { confirmText: 'Yes, cancel', cancelText: 'Keep order' });
-    if (!r.isConfirmed) return;
-    if (await cancelOrder(order.id)) toast.success('Order cancelled');
-  };
 
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 gap-3.5 pb-10">
@@ -86,7 +78,6 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
       <View className="gap-2.5">
         <Button variant="outline" title="Need help? Chat with us" icon={<Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />} onPress={() => navigation.navigate('Chat')} />
-        {canCancel && <Button variant="neutral" title="Cancel order" onPress={onCancel} />}
       </View>
     </ScrollView>
   );

@@ -147,7 +147,7 @@ export default function DoctorProfileScreen({ navigation, route }: any) {
     if (it.key === 'kyc' && kyc) return { chip: KYC_STATUS[kyc] };
     if (it.key === 'documents' && ready) return { text: `${docsDone}/${DOCTOR_DOCUMENT_TYPES.length}` };
     if (it.key === 'language') return { text: language.label };
-    if (it.key === 'subscription' && ready) return subscription ? { text: plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId } : expiredPlan ? { chip: { label: 'Ended', tone: 'red' as Tone } } : { text: 'Free' };
+    if (it.key === 'subscription' && ready) return subscription ? (subscription.state === 'expiring' && !subscription.cancelled ? { chip: { label: 'Renew soon', tone: 'yellow' as Tone } } : { text: plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId }) : expiredPlan ? { chip: expiredPlan.state === 'paused' ? { label: 'Paused', tone: 'red' as Tone } : { label: 'Renew', tone: 'yellow' as Tone } } : { text: 'Free' };
     if (it.key === 'shared' && pendingInvites > 0) return { chip: { label: `${pendingInvites} new`, tone: 'yellow' as Tone } };
     return {};
   };

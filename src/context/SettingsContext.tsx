@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { AdditionalInfo, Collaborator, Invitation, NotificationPrefs, Plan, SettingsDoc, Subscription, DEFAULT_YEARLY_SAVING, defaultPrefs, emptyInfo } from '../data/settings';
+import { AdditionalInfo, Collaborator, EndedPlan, Invitation, NotificationPrefs, Plan, PlanLimits, SettingsDoc, Subscription, DEFAULT_YEARLY_SAVING, defaultPrefs, emptyInfo } from '../data/settings';
 import { plans as fallbackPlans } from '../data/mock';
 import { settingsService } from '../services/settings.service';
 import { useAuth } from './AuthContext';
@@ -13,10 +13,14 @@ type Ctx = {
   reload: () => Promise<void>;
   plans: Plan[];
   yearlySaving: number;
-  /** null = on the free plan */
+  /** The paid plan that is still running; null when there is none. */
   subscription: Subscription | null;
-  /** Last paid plan that has ended (while on the free plan again); null otherwise. */
-  expiredPlan: { planId: string; endedOn: string } | null;
+  /** A paid plan whose end date has passed (grace period or paused - never moved to the free plan); null otherwise.
+   *  subscription and expiredPlan both null = never bought a paid plan, so the account is on the free plan. */
+  expiredPlan: EndedPlan | null;
+  /** Current plan limits + usage (null until loaded). */
+  limits: PlanLimits | null;
+  refreshSubscription: () => Promise<void>;
   cancelPlan: () => Promise<void>;
   restorePlan: () => Promise<void>;
   /** Paid plan purchase: server creates the Razorpay order -> checkout sheet -> server verifies the signature and activates. Throws PaymentCancelled if the sheet is closed. */
@@ -54,6 +58,7 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
   const [yearlySaving, setYearlySaving] = useState(DEFAULT_YEARLY_SAVING);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [expiredPlan, setExpiredPlan] = useState<Ctx['expiredPlan']>(null);
+  const [limits, setLimits] = useState<PlanLimits | null>(null);
   const [info, setInfo] = useState<AdditionalInfo>(emptyInfo);
   const [infoLoaded, setInfoLoaded] = useState(false);
   const [ready, setReady] = useState(false);
@@ -74,6 +79,7 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
       settingsService.getPlans(role).then((r) => { if (r.plans.length) setPlans(r.plans); else if (!owner) setPlans([]); if (r.yearlySaving != null) setYearlySaving(r.yearlySaving); })
         .catch(() => { if (!owner) setPlans([]); }), // never show the owner's fallback plans to a doctor / store manager
       settingsService.getMySubscriptionState().then((s) => { setSubscription(s.current); setExpiredPlan(s.expired); }).catch(() => {}),
+      settingsService.getMyLimits().then(setLimits).catch(() => {}),
       settingsService.getInfo().then(setInfo).catch(() => {}).finally(() => setInfoLoaded(true)),
       settingsService.getPrefs().then(setPrefs).catch(() => {}),
       settingsService.getDocuments().then(setDocuments).catch(() => {}),
@@ -87,7 +93,7 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
 
   useEffect(() => {
     if (user?.id) reload();
-    else { setSubscription(null); setExpiredPlan(null); setInfo(emptyInfo); setInfoLoaded(false); setReady(false); setDocuments({}); setPrefs(defaultPrefs()); setCollaborators([]); setInvitations([]); }
+    else { setSubscription(null); setExpiredPlan(null); setLimits(null); setInfo(emptyInfo); setInfoLoaded(false); setReady(false); setDocuments({}); setPrefs(defaultPrefs()); setCollaborators([]); setInvitations([]); }
   }, [user?.id, reload]);
 
   const refreshCollabs = async () => {
@@ -95,11 +101,14 @@ export function SettingsProvider({ children, scope = 'owner' }: { children: Reac
     setCollaborators(await settingsService.listCollaborators());
   };
   const refreshInvites = async () => setInvitations(await settingsService.listInvitations());
-  const refreshSub = async () => { const s = await settingsService.getMySubscriptionState(); setSubscription(s.current); setExpiredPlan(s.expired); };
+  const refreshSub = async () => {
+    const [s, l] = await Promise.all([settingsService.getMySubscriptionState(), settingsService.getMyLimits().catch(() => null)]);
+    setSubscription(s.current); setExpiredPlan(s.expired); if (l) setLimits(l);
+  };
 
   return (
     <SettingsContext.Provider value={{
-      loading, ready, reload, plans, yearlySaving, subscription, expiredPlan,
+      loading, ready, reload, plans, yearlySaving, subscription, expiredPlan, limits, refreshSubscription: refreshSub,
       cancelPlan: async () => { await settingsService.cancelSubscription(); await refreshSub(); },
       restorePlan: async () => { await settingsService.restoreSubscription(); await refreshSub(); },
       buyPlan: async (plan, billing) => {

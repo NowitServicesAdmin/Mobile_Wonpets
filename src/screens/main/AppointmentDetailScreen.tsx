@@ -9,7 +9,7 @@ import PetAvatar from '../../components/PetAvatar';
 import { Avatar } from '../../components/Avatar';
 import RescheduleSheet from '../../components/appointments/RescheduleSheet';
 import { MODE_ICON, STATUS_META, StatusPill, apptDateParts } from '../../components/appointments/AppointmentCard';
-import { WonPetsAlert, toast } from '../../components/WonPetsAlert';
+import { toast } from '../../components/WonPetsAlert';
 import { appointmentsService } from '../../services/appointments.service';
 import { usePets } from '../../context/PetsContext';
 import { useChat } from '../../context/ChatContext';
@@ -35,7 +35,7 @@ const InfoRow = ({ icon, k, v }: { icon: React.ComponentProps<typeof Ionicons>['
 );
 
 export default function AppointmentDetailScreen({ route, navigation }: any) {
-  const { appointments, cancelAppointment, rescheduleAppointment, upsertAppointment } = usePets();
+  const { appointments, rescheduleAppointment, upsertAppointment } = usePets();
   const { registerContact } = useChat();
   const insets = useSafeAreaInsets();
   const [resched, setResched] = useState(false);
@@ -53,11 +53,6 @@ export default function AppointmentDetailScreen({ route, navigation }: any) {
   const canJoin = a.mode === 'Online' && (a.status === 'Confirmed' || a.status === 'In Progress');
   const canChat = !!a.doctorId && !!a.doctor && a.status !== 'Cancelled';
 
-  const onCancel = async () => {
-    const r = await WonPetsAlert.confirm('Cancel appointment?', 'This cannot be undone.', { confirmText: 'Yes, cancel', cancelText: 'Keep' });
-    if (!r.isConfirmed) return;
-    if (await cancelAppointment(a.id)) toast.success('Appointment cancelled');
-  };
   const chat = () => {
     // the vet comes from the real appointment, so add them to the chat list first
     registerContact({ id: a.doctorId!, kind: 'vet', name: a.doctor!, emoji: '👩‍⚕️', subtitle: a.doctorSpec || 'Veterinary', status: 'offline' });
@@ -157,9 +152,10 @@ export default function AppointmentDetailScreen({ route, navigation }: any) {
         </Card>
 
         {open && (
-          <Pressable onPress={onCancel} className="flex-row items-center justify-center gap-1.5 py-3 active:opacity-70">
-            <Ionicons name="close-circle-outline" size={18} color={colors.red} /><Text className="text-red font-bold">Cancel appointment</Text>
-          </Pressable>
+          <View className="flex-row items-center justify-center gap-1.5 py-2">
+            <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
+            <Text className={T.small}>Booked appointments can't be cancelled. You can reschedule instead.</Text>
+          </View>
         )}
       </ScrollView>
 

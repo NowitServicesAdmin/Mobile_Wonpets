@@ -75,7 +75,23 @@ export const emptyInfo: AdditionalInfo = { location: '', doorNo: '', address: ''
 /** Server-configured yearly discount on the web (monthly x 12 less this %). */
 export const DEFAULT_YEARLY_SAVING = 17;
 export type Plan = { id: string; name: string; emoji: string; monthly: number; features: string[]; color: string; popular?: boolean };
-export type Subscription = { planId: string; billing: 'monthly' | 'yearly'; renewsOn: string; cancelled: boolean };
+/** A paid plan that is still running. `expiring` = it ends within the renew window, so "Renew now" is offered. */
+export type Subscription = {
+  planId: string; billing: 'monthly' | 'yearly'; renewsOn: string; cancelled: boolean;
+  state: 'active' | 'expiring'; daysLeft: number; canRenew: boolean;
+};
+/** A paid plan whose end date has passed. It is never switched to the free plan:
+ *  `grace` - every paid feature still works until `graceEndsOn`; `paused` - data is kept, nothing new can be added until renewal. */
+export type EndedPlan = {
+  planId: string; billing: 'monthly' | 'yearly'; endedOn: string;
+  state: 'grace' | 'paused'; graceEndsOn: string; graceDaysLeft: number;
+};
+/** One row of GET /subscriptions/limits `defs`. */
+export type LimitDef = { key: string; label: string; type: 'count' | 'toggle' | 'choice'; noun?: string; options?: string[] };
+export type PlanLimits = {
+  planName: string; isFreePlan: boolean; planState: 'active' | 'expiring' | 'grace' | 'paused' | null;
+  limits: Record<string, number | boolean | string | null>; usage: Record<string, number>; overLimit: string[]; defs: LimitDef[];
+};
 
 // ---------- collaborators (people you share your pets with) ----------
 export type CollabStatus = 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';

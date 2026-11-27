@@ -84,7 +84,7 @@ export default function SettingsScreen({ route }: any) {
   const scroll = useRef<ScrollViewInstance>(null);
   const place = headerLocation(info, user?.location); // same source as the app header
   const pendingInvites = invitations.filter((i) => i.status === 'pending').length;
-  const planName = subscription ? plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId : expiredPlan ? 'Ended' : 'Free';
+  const planName = subscription ? plans.find((p) => p.id === subscription.planId)?.name ?? subscription.planId : expiredPlan ? (expiredPlan.state === 'paused' ? 'Paused' : 'Renew now') : 'Free';
 
   // the screen is a tab, so it stays mounted - react when another screen asks for a section
   useEffect(() => {

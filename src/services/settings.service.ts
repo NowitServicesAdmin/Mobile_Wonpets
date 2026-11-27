@@ -1,6 +1,6 @@
 import { api, fileFromUri } from './api';
 import { absUrl } from './mappers';
-import type { AdditionalInfo, Collaborator, DirectoryUser, SharedPet, Invitation, NotificationPrefs, Plan, SettingsDoc, Subscription } from '../data/settings';
+import type { AdditionalInfo, Collaborator, DirectoryUser, SharedPet, Invitation, NotificationPrefs, Plan, SettingsDoc, Subscription, EndedPlan, PlanLimits } from '../data/settings';
 import { defaultPrefs, emptyInfo } from '../data/settings';
 
 const multipart = { headers: { 'Content-Type': 'multipart/form-data' } };
@@ -107,16 +107,43 @@ export const settingsService = {
       })),
     };
   },
-  /** `current` is only a plan that is still running (status active AND end date in the future) - an ended plan is never "current".
-   *  `expired` carries the last paid plan that has ended so the screen can say so. Both null = never subscribed / on the free plan. */
-  async getMySubscriptionState(): Promise<{ current: (Subscription & { active: boolean }) | null; expired: { planId: string; endedOn: string } | null }> {
+  /** `current` is a paid plan that is still running (end date in the future). `expired` is a paid plan whose end date has
+   *  passed - in its grace period (paid features still work) or paused (data kept, nothing new can be added). An ended plan
+   *  never falls back to the free plan. Both null = never bought a paid plan, so the account is on the free plan. */
+  async getMySubscriptionState(): Promise<{ current: Subscription | null; expired: EndedPlan | null }> {
     const { data } = await api.get('/subscriptions/me');
     const s = data.subscription;
-    if (!s) return { current: null, expired: null };
-    const live = s.status === 'active' && (s.isCurrentlyActive ?? (!!s.endDate && new Date(s.endDate).getTime() > Date.now()));
-    if (live) return { current: { planId: s.planName, billing: s.billingCycle === 'yearly' ? 'yearly' : 'monthly', renewsOn: isoDay(s.endDate), cancelled: !!s.cancelRequested, active: true }, expired: null };
-    const endedPaid = (s.status === 'expired' || s.status === 'active') && s.planName && s.planName !== 'basic';
-    return { current: null, expired: endedPaid ? { planId: s.planName, endedOn: isoDay(s.endDate) } : null };
+    if (!s || !s.planName || !s.endDate || !['active', 'trial', 'expired', 'cancelled'].includes(s.status)) return { current: null, expired: null };
+    const billing: 'monthly' | 'yearly' = s.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+    const end = new Date(s.endDate).getTime();
+    const DAY = 86400000;
+    // older servers do not send `state` - work it out the same way (7-day renew window, 7-day grace)
+    const graceEnd = s.graceEndsAt ? new Date(s.graceEndsAt).getTime() : end + 7 * DAY;
+    const state: string = s.state ?? (end > Date.now() ? (end - Date.now() <= 7 * DAY ? 'expiring' : 'active') : graceEnd > Date.now() ? 'grace' : 'paused');
+    if (state === 'active' || state === 'expiring') {
+      return {
+        current: {
+          planId: s.planName, billing, renewsOn: isoDay(s.endDate), cancelled: !!s.cancelRequested, state,
+          daysLeft: s.daysUntilEnd ?? Math.max(0, Math.ceil((end - Date.now()) / DAY)), canRenew: s.canRenew ?? state === 'expiring',
+        },
+        expired: null,
+      };
+    }
+    return {
+      current: null,
+      expired: {
+        planId: s.planName, billing, endedOn: isoDay(s.endDate), state: state === 'grace' ? 'grace' : 'paused',
+        graceEndsOn: isoDay(new Date(graceEnd).toISOString()), graceDaysLeft: s.graceDaysLeft ?? Math.max(0, Math.ceil((graceEnd - Date.now()) / DAY)),
+      },
+    };
+  },
+  /** What the current plan allows and how much of it is used (drives the "Your plan limits" card). */
+  async getMyLimits(): Promise<PlanLimits> {
+    const { data } = await api.get('/subscriptions/limits');
+    return {
+      planName: data.planName || '', isFreePlan: data.isFreePlan ?? true, planState: data.planState ?? null,
+      limits: data.limits || {}, usage: data.usage || {}, overLimit: data.overLimit || [], defs: data.defs || [],
+    };
   },
   async cancelSubscription(reason = '') {
     await api.patch('/subscriptions/cancel', { reason });

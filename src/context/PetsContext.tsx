@@ -64,7 +64,6 @@ type Ctx = {
   /** Insert / replace an appointment returned by the API (after booking). */
   upsertAppointment: (a: Appointment) => void;
   rescheduleAppointment: (id: string, patch: { isoDate: string; time: string }) => Promise<boolean>;
-  cancelAppointment: (id: string) => Promise<boolean>;
   /** Today's merged schedule for one pet (daily plan + own tasks + one-offs + medicine + appointments). */
   scheduleFor: (petId: string) => ScheduleItem[];
   completeTask: (item: ScheduleItem) => void;
@@ -254,16 +253,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const cancelAppointment: Ctx["cancelAppointment"] = async (id) => {
-    try {
-      await appointmentsService.cancel(id);
-      setAppointments((x) => x.map((a) => (a.id === id ? { ...a, status: "Cancelled" } : a)));
-      return true;
-    } catch (e) {
-      toast.error(errorMessage(e, "Could not cancel the appointment."));
-      return false;
-    }
-  };
+  // Pet owners can't cancel a booked appointment (the server refuses it) - only reschedule.
 
   /* ------------------------------- schedule ------------------------------- */
   const scheduleFor: Ctx["scheduleFor"] = (petId) => {
@@ -375,7 +365,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         pets, appointments, dailyTasks, ownerTasks, loading, loaded,
         refreshAll, refreshAppointments, refreshSchedule, syncQuiet, loadDailyTasks, dailyTasksFor,
         addPet, updatePet, deletePet, toggleFavorite,
-        upsertAppointment, rescheduleAppointment, cancelAppointment,
+        upsertAppointment, rescheduleAppointment,
         scheduleFor, completeTask, isDailyEnabled, setDailyEnabled,
         createOwnerTask, updateOwnerTask, deleteOwnerTask, createSchedule,
       }}
